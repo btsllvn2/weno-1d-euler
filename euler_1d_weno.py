@@ -32,11 +32,10 @@ def euler_1d_wavespeed(q):
     p = (gam-1.0)*(e-0.5*rho*u**2)
     c = np.sqrt(gam*p/rho) 
 
-    #physical flux function
+    #define wavespeed(s) on the grid
     ws = np.zeros(q.shape)
-    ws[:,0] = u-c
-    ws[:,1] = u
-    ws[:,2] = u+c
+    for j in range(3):
+        ws[:,j] = u+(j-1)*c 
 
     #maximum wavespeed on the domain for global LF splitting
     for j in range(q.shape[1]):
