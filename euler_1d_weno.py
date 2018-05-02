@@ -2,51 +2,56 @@ def init_cond(X_min,X_max,N,P4,T4,P1,T1,x_bnd=0.0):
 #compute the initial condition on the grid for Reimann problem
 #coordinate system centered at fluid interface (default is x=0, otherwise x=x_bnd)
 
-    import numpy as np
-   
-    #define constants
-    gam = 1.4
-    R = 286.9
- 
-    #allocate space for variables
-    q_init = np.zeros((N,3))
+	import numpy as np
+
+	#define constants
+	gam = 1.4
+	R = 286.9
+
+	#allocate space for variables
+	q_init = np.zeros((N,3))
 	rho = np.zeros(N)
 	u = np.zeros(N)
-	p = np.zeros(N)
+	P = np.zeros(N)
 	T = np.zeros(N)
 
 	#var_lst = [rho,u,p,T]
-    #for var in var_lst: 
-    #    var = np.zeros(N)
+	#for var in var_lst: 
+	#    var = np.zeros(N)
 
-    #initialize primative variables
-    X = np.linspace(X_min,X_max,N)
-    for i in range(N):
-        if (X[i]<=x_bnd):
-            P[i] = P4
-            T[i] = T4
-        else:
-            P[i] = P1
-            T[i] = T1
-        rho[i] = P[i]/(R*T[i])
-        u[i] = 0.0
+	#initialize primative variables
+	X = np.linspace(X_min,X_max,N)
+	for i in range(N):
+		if(X[i]<=x_bnd):
+			P[i] = P4
+			T[i] = T4
+		else:
+			P[i] = P1
+			T[i] = T1
+		
+		rho[i] = P[i]/(R*T[i])
+		u[i] = 0.0
 
-    #define the initial condition vector
-    q_init[:,0] = rho
-    q_init[:,1] = rho*u
-    q_init[:,2] = p/(gam-1.0) + 0.5*rho*u**2
+	#define the initial condition vector
+	q_init[:,0] = rho
+	q_init[:,1] = rho*u
+	q_init[:,2] = P/(gam-1.0) + 0.5*rho*u**2
 
-    return q_init,X
-	
+	return q_init,X
+
+'''	
+#Test init_cond
 q,x = init_cond(-17.0,2.0,100,70e5,300,1e5,300)
 
 import matplotlib.pyplot as plt
 import sys,os
 
+
 plt.figure()
-plt.plot(x,q[:,0],'-b','linewidth=3.5')
+plt.plot(x,q[:,0],'-b',linewidth=3.5)
 plt.show()
 sys.exit()
+'''
 
 def phys_flux(q):
 #q is an Nxnv matrix with N grid points and nv variables   
