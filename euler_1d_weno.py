@@ -49,7 +49,7 @@ def phys_flux(q):
     f = np.zeros(q.shape)
     f[:,0] = rho*u
     f[:,1] = p+rho*u**2
-    f[:,2] = u*(p+rho*e)
+    f[:,2] = u*(p+e)
 
     return f
 
