@@ -9,13 +9,18 @@ def init_cond(X_min,X_max,N,P4,T4,P1,T1,x_bnd=0.0):
     R = 286.9
  
     #allocate space for variables
-    q_init = np.zeros((N+6,3))
-    var_lst = [rho,u,p,T]
-    for var in var_lst: 
-        var = np.zeros(N)
+    q_init = np.zeros((N,3))
+	rho = np.zeros(N)
+	u = np.zeros(N)
+	p = np.zeros(N)
+	T = np.zeros(N)
+
+	#var_lst = [rho,u,p,T]
+    #for var in var_lst: 
+    #    var = np.zeros(N)
 
     #initialize primative variables
-    x = np.linspace(X_min,X_max,N)
+    X = np.linspace(X_min,X_max,N)
     for i in range(N):
         if (X[i]<=x_bnd):
             P[i] = P4
@@ -31,7 +36,17 @@ def init_cond(X_min,X_max,N,P4,T4,P1,T1,x_bnd=0.0):
     q_init[:,1] = rho*u
     q_init[:,2] = p/(gam-1.0) + 0.5*rho*u**2
 
-    return q_init
+    return q_init,X
+	
+q,x = init_cond(-17.0,2.0,100,70e5,300,1e5,300)
+
+import matplotlib.pyplot as plt
+import sys,os
+
+plt.figure()
+plt.plot(x,q[:,0],'-b','linewidth=3.5')
+plt.show()
+sys.exit()
 
 def phys_flux(q):
 #q is an Nxnv matrix with N grid points and nv variables   
