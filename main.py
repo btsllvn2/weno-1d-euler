@@ -14,9 +14,12 @@
 import numpy as np
 import scipy.linalg as la 
 import matplotlib.pyplot as plt
+import sys,os
 
 # Import the helper functions
 from euler_1d_weno import *
+
+os.system('clear')
 
 # Specify the number of points in the domain (includes ghost points)
 N = 100
@@ -55,11 +58,9 @@ plt.plot(X[3:N-3],q[3:N-3,0],'-b',linewidth=3.5)
 #plt.show()
 # --------------------------------------------------
 
-# [STEP 2]: Compute the flux terms 
-f = phys_flux(q)
 
 # [STEP 3]: Compute the numerical charecteristic flux at the half points
-f_char_i_p_half = char_numerical_flux(q, f)
+f_char_i_p_half = char_numerical_flux(q)
 
 # --------------------------------------------------
 

@@ -35,23 +35,23 @@ def init_cond(X_min,X_max,N,P4,T4,P1,T1,x_bnd=0.0):
     q_init[:,1] = rho*u
     q_init[:,2] = P/(gam-1.0) + 0.5*rho*u**2
     
-    #assign the ghost cell values
-    for i in range(3):
-        q_init[i,0] =  q_init[6-i,0]
-        q_init[i,1] = -q_init[6-i,1]
-        q_init[i,2] =  q_init[6-i,2]
-        q_init[N-1-i,0] =  q_init[N-6+i,0]
-        q_init[N-1-i,1] = -q_init[N-6+i,1]
-        q_init[N-1-i,2] =  q_init[N-6+i,2]
-    
     # #assign the ghost cell values
-    # q_init[0,:] = (10*-3)**10
-    # q_init[1,:] = (10*-2)**10
-    # q_init[2,:] = (10*-1)**10
+    # for i in range(3):
+        # q_init[i,0] =  q_init[6-i,0]
+        # q_init[i,1] = -q_init[6-i,1]
+        # q_init[i,2] =  q_init[6-i,2]
+        # q_init[N-1-i,0] =  q_init[N-6+i,0]
+        # q_init[N-1-i,1] = -q_init[N-6+i,1]
+        # q_init[N-1-i,2] =  q_init[N-6+i,2]
     
-    # q_init[N-1,:] = (10*3)**10
-    # q_init[N-2,:] = (10*2)**10
-    # q_init[N-3,:] = (10*1)**10
+    #assign the ghost cell values
+    q_init[0,:] = ((10*3)**10)
+    q_init[1,:] = ((10*2)**10)
+    q_init[2,:] = ((10*1)**10)
+    
+    q_init[N-1,:] = ((10*3)**10)
+    q_init[N-2,:] = ((10*2)**10)
+    q_init[N-3,:] = ((10*1)**10)
 
     return q_init, X
 
@@ -136,9 +136,12 @@ def langrange_extrap(x_in,q_in,x_ext,q_ext):
 
     return q_ext
 
-def char_numerical_flux(q, f):
+def char_numerical_flux(q):
 
     import numpy as np
+    
+    # Compute the fluxes on the entire grid
+    f = phys_flux(q)
 
     # Compute the state vector at the x_{1+1/2} points
     q_i_p_half = (q[2:q.shape[0]-3,:] + q[3:q.shape[0]-2,:])*0.5
@@ -175,15 +178,23 @@ def char_numerical_flux(q, f):
         qi, fi = proj_to_char(q[i:i+stencil_size+1,:], f[i:i+stencil_size+1,:], q_i_p_half[i])
         
         for j in range(stencil_size):
-            f_char_p[0:Nvar, j] = (0.5*( (fi[j,:]).T + (np.diag(ws)).dot((qi[j,:]).T) )).T
-            f_char_m[0:Nvar, j] = (0.5*( (fi[j+1,:]).T - (np.diag(ws)).dot((qi[j+1,:]).T) )).T
+            f_char_p[:,j] = (0.5*( (fi[j,:]).T + (np.diag(ws)).dot((qi[j,:]).T) )).T
+            f_char_m[:,j] = (0.5*( (fi[j+1,:]).T - (np.diag(ws)).dot((qi[j+1,:]).T) )).T
 
         # Compute the i + 1/2 points flux
         for k in range(0, Nvar):
-            f_char_i_p_half[i,k] = phi_weno5(f_char_p[k, :],0) + phi_weno5(f_char_m[k, ::-1],1)
-            if(np.abs(f_char_i_p_half[i,k])>10**8):
-                print("i = ",i," s = ",k," total number of x_{i+1/2} points = ",N_x_p_half)
-            
+            print('\tPositive Flux')
+            print('%d\t%3.4f\t%3.4f\t%3.4f\t%3.4f\t%3.4f' % (i,f_char_p[k,0],f_char_p[k,1],f_char_p[k,2],f_char_p[k,3],f_char_p[k,4]))
+            print(" ---------------------- ")
+            print('\tNegative Flux')
+            print('%d\t%3.4f\t%3.4f\t%3.4f\t%3.4f\t%3.4f' % (i,f_char_m[k,0],f_char_m[k,1],f_char_m[k,2],f_char_m[k,3],f_char_m[k,4]))
+            f_char_i_p_half[i,k] = phi_weno5(f_char_p[k,:],i) + phi_weno5(f_char_m[k,::-1],i)
+            print(" ---------------------- ")
+            print(" ---------------------- ")
+            # if(np.abs(f_char_i_p_half[i,k])>10**8):
+                # print("i = ",i," s = ",k," total number of x_{i+1/2} points = ",N_x_p_half)
+        
+        input('waiting for you')
     return f_char_i_p_half
 
 
@@ -204,26 +215,30 @@ def phi_weno5(f_char_p_s,flg):
     beta_0 = (13/12)*(f_i_m_2 - 2*f_i_m_1 + f_i)**2 + (1/4)*(f_i_m_2 - 4*f_i_m_1 + 3*f_i)**2
     beta_1 = (13/12)*(f_i_m_1 - 2*f_i + f_i_p_1)**2 + (1/4)*(f_i_m_1 - f_i_p_1)**2
     beta_2 = (13/12)*(f_i - 2*f_i_p_1 + f_i_p_2)**2 + (1/4)*(3*f_i - 4*f_i_p_1 + f_i_p_2)**2
+ 
+    #print('%d\t%1.4e\t%1.4e\t%1.4e' % (flg,beta_0,beta_1,beta_2))
+ 
+    epsilon = 1e-6
     
-    ep = 1e-6
-    
-    w0_tilde = 0.1/(ep + beta_0)**2
-    w1_tilde = 0.6/(ep + beta_1)**2
-    w2_tilde = 0.3/(ep + beta_2)**2
+    w0_tilde = 0.1/(epsilon + beta_0)**2
+    w1_tilde = 0.6/(epsilon + beta_1)**2
+    w2_tilde = 0.3/(epsilon + beta_2)**2
     
     w0 = w0_tilde/(w0_tilde + w1_tilde + w2_tilde)
     w1 = w1_tilde/(w0_tilde + w1_tilde + w2_tilde)
     w2 = w2_tilde/(w0_tilde + w1_tilde + w2_tilde)
     
+    #print('%d\t%3.4f\t%3.4f\t%3.4f' % (flg,w0,w1,w2))
+    
     f_char_i_p_half_p_s = w0*f0 + w1*f1 + w2*f2
     
-    if(np.abs(f_char_i_p_half_p_s)>10**8):
-        print("f_char_p_s[0] = ",f_char_p_s[0]," flux direction = ",flg)
-        print("f_char_p_s[1] = ",f_char_p_s[1])
-        print("f_char_p_s[2] = ",f_char_p_s[2])
-        print("f_char_p_s[3] = ",f_char_p_s[3])
-        print("f_char_p_s[0] = ",f_char_p_s[4])
-        print(" --- ")
+    # if(np.abs(f_char_i_p_half_p_s)>10**8):
+        # print("f_char_p_s[0] = ",f_char_p_s[0]," flux direction = ",flg)
+        # print("f_char_p_s[1] = ",f_char_p_s[1])
+        # print("f_char_p_s[2] = ",f_char_p_s[2])
+        # print("f_char_p_s[3] = ",f_char_p_s[3])
+        # print("f_char_p_s[0] = ",f_char_p_s[4])
+        # print(" --- ")
         # print("w0 = ",w0," f0 = ",f0," flux direction = ",flg) 
         # print("w1 = ",w1," f1 = ",f1)         
         # print("w2 = ",w2," f2 = ",f2) 
@@ -234,7 +249,7 @@ def proj_to_char(q,f,q_st):
     '''
     q is a nsxnv matrix of conservative variables (ns = num pts in current stencil)  
     f is a nsxnv matrix of conservative fluxes (ns = num pts in current stencil)  
-    q_st is a 2xnv matrix with nv variables to compute average state 
+    q_st is a 1xnv vector with nv variables of average state 
 
     '''
     import numpy as np
@@ -258,6 +273,21 @@ def proj_to_char(q,f,q_st):
     L[0,2] = L[2,2] = (gam-1.0)/(2*c**2)
     L[1,2] = -(gam-1.0)/c**2
 
+    #matrix of right eigenvectors of A (eigenvalues in order u-c, u, and u+c)
+    R = np.zeros((3,3))
+    R[0,:] = 1.0
+    R[1,0] = u-c
+    R[1,1] = u
+    R[1,2] = u+c
+    R[2,0] = c**2/(gam-1.0)+0.5*u**2-u*c
+    R[2,1] = 0.5*u**2
+    R[2,2] = c**2/(gam-1.0)+0.5*u**2+u*c
+    
+    #eigenvector test
+    mat = np.eye(3)-R.dot(L)
+    print(mat)
+    #input('Is this year')
+    
     #project solution/flux into characteristic space for each point in stencil
     q_char = np.zeros(q.shape)
     f_char = np.zeros(f.shape)
