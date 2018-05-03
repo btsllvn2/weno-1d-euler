@@ -253,6 +253,7 @@ def q1d_afunc(x,r,makePlot=False,demo=False):
         plt.ylabel(r'$r\;[m]$',fontsize=15)
         plt.title(r'GALCIT Ludwieg Tube - Nozzle',fontsize=17)
         plt.legend(fontsize=12)
+        plt.savefig('fig_%d.pdf' % f_num)
         #plt.show()
         f_num += 1
         #sys.exit()
@@ -343,11 +344,11 @@ def Shock_Tube_Exact(makePlots=False):
     err = 1.0; cntr = 0; h=1e-30; M_sh = 1.5
     #print('P_41 = %d' % P_41)
     Res = lambda M_sh: -P_41*(1-(gam-1)/(gam+1)*(c_R/c_L)*(M_sh**2-1)/M_sh)**(2*gam/(gam-1))+2*gam/(gam+1)*(M_sh**2-1)+1
-    print('Solving for shock Mach number (M_sh) based on PR = P_41:')
+    print('Solving for shock Mach number (M_sh) based on P_41=%3.1f:' % P_41)
     while (err>eps): 
         cntr += 1; Msh_p = M_sh
         M_sh -= h*Res(M_sh)/np.imag(Res(complex(M_sh,h)))
-        err = M_sh/Msh_p-1
+        err = abs(M_sh/Msh_p-1)
         print('    N = %d, e = %1.6e' % (cntr,err))
 
         #limit total number of iterations
@@ -384,7 +385,6 @@ def Shock_Tube_Exact(makePlots=False):
     q_an = np.zeros((N,3))
     for i in range(N):
 
-
         #undisturbed driven (right) state 
         if (x[i]>x_sh):
             rho = q_R[0]
@@ -401,16 +401,16 @@ def Shock_Tube_Exact(makePlots=False):
         else:
 
             #define a locator variable
-            phi = (x[i]-x_fR)/(x_ct-x_fR)
+            xi = (x[i]-x_fR)/(x_ct-x_fR)
             
             #x between shock and contact discontinuity
-            if (phi>1.0):
+            if (xi>1.0):
                 rho = ((1+alpha*P_21)/(alpha+P_21))*q_R[0]
                 u   = u2
                 p   = P_21*((gam-1)*q_R[2])
 
             #x within the expansion fan
-            elif (phi<0.0):
+            elif (xi<0.0):
                 u   = 2/(gam+1)*(c_L+(x[i]-x0)/t)
                 p   = (gam-1)*q_L[2]*(1-(gam-1)*u/(2*c_L))**(2*gam/(gam-1))
                 rho = q_L[0]*(p/((gam-1)*q_L[2]))**(1/gam)
@@ -446,22 +446,18 @@ def Shock_Tube_Exact(makePlots=False):
     ax1 = fig.add_subplot(221)
     ax1.plot(x,q_an[:,0],'-b',linewidth=3.0)
     ax1.set_title('Density (t=%1.3f[ms])' % float(1000*t))
-    #ax1.grid()
     ax1.set(xlabel=r'$x\;[m]$', ylabel=r'$\rho\;[kg/m^3]$')
     ax2 = fig.add_subplot(222)
     ax2.plot(x,(1e-3)*P_plot,'-b',linewidth=3.0)
     ax2.set_title('Pressure (t=%1.3f[ms])' % float(1000*t))
-    #ax2.grid()
     ax2.set(xlabel=r'$x\;[m]$', ylabel=r'$p\;[kPa]$')
     ax3 = fig.add_subplot(223)
     ax3.plot(x,U,'-b',linewidth=3.0)
     ax3.set_title('Velocity (t=%1.3f[ms])' % float(1000*t))
-    #ax3.grid()
     ax3.set(xlabel=r'$x\;[m]$', ylabel=r'$V\;[m/s]$')
     ax4 = fig.add_subplot(224)
     ax4.plot(x,Mach,'-b',linewidth=3.0)
     ax4.set_title('Mach (t=%1.3f[ms])' % float(1000*t))
-    #ax4.grid()
     ax4.set(xlabel=r'$x\;[m]$', ylabel=r'$M$')
     fig.tight_layout()
     plt.savefig('fig_%d.pdf' % f_num)
@@ -469,24 +465,20 @@ def Shock_Tube_Exact(makePlots=False):
 
     fig = plt.figure(f_num)
     ax1 = fig.add_subplot(221)
-    ax1.plot(x,(1e-6)*e,'-b',linewidth=3.0)
+    ax1.plot(x,(1e-3)*e,'-b',linewidth=3.0)
     ax1.set_title('Specific Energy (t=%1.3f[ms])' % float(1000*t))
-    #ax1.grid()
-    ax1.set(xlabel=r'$x\;[m]$', ylabel=r'$e\;[MJ/kg]$')
+    ax1.set(xlabel=r'$x\;[m]$', ylabel=r'$e\;[kJ/kg]$')
     ax2 = fig.add_subplot(222)
     ax2.plot(x,c_plot,'-b',linewidth=3.0)
     ax2.set_title('Speed of Sound (t=%1.3f[ms])' % float(1000*t))
-    #ax2.grid()
     ax2.set(xlabel=r'$x\;[m]$', ylabel=r'$c\;[m/s]$')
     ax3 = fig.add_subplot(223)
     ax3.plot(x,T_plot,'-b',linewidth=3.0)
     ax3.set_title('Temperature (t=%1.3f[ms])' % float(1000*t))
-    #ax3.grid()
     ax3.set(xlabel=r'$x\;[m]$', ylabel=r'$T\;[K]$')
     ax4 = fig.add_subplot(224)
     ax4.plot(x,(1e-3)*Entropy,'-b',linewidth=3.0)
     ax4.set_title('Entropy (t=%1.3f[ms])' % float(1000*t))
-    #ax4.grid()
     ax4.set(xlabel=r'$x\;[x]$', ylabel=r'$s\;[kJ/kgK]$')
     fig.tight_layout()
     plt.savefig('fig_%d.pdf' % f_num)
@@ -518,7 +510,7 @@ def phi_weno5():
 #print("ws_max = ", ws)
 #
 ##test area ratio function
-f_num=5
+f_num=1
 q1d_afunc(1,1,True,True)
 
 #test exact solution function
