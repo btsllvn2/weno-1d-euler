@@ -3,42 +3,42 @@ def init_cond(X_min,X_max,N,P4,T4,P1,T1,x_bnd=0.0):
 #compute the initial condition on the grid for Reimann problem
 #coordinate system centered at fluid interface (default is x=0, otherwise x=x_bnd)
 
-	import numpy as np
+    import numpy as np
 
-	#define constants
-	gam = 1.4
-	R = 286.9
+    #define constants
+    gam = 1.4
+    R = 286.9
 
-	#allocate space for variables
-	q_init = np.zeros((N,3))
-	rho = np.zeros(N)
-	u = np.zeros(N)
-	P = np.zeros(N)
-	T = np.zeros(N)
+    #allocate space for variables
+    q_init = np.zeros((N,3))
+    rho = np.zeros(N)
+    u = np.zeros(N)
+    P = np.zeros(N)
+    T = np.zeros(N)
 
-	#var_lst = [rho,u,p,T]
-	#for var in var_lst: 
-	#    var = np.zeros(N)
+    #var_lst = [rho,u,p,T]
+    #for var in var_lst: 
+    #    var = np.zeros(N)
 
-	#initialize primative variables
-	X = np.linspace(X_min,X_max,N)
-	for i in range(N):
-		if(X[i]<=x_bnd):
-			P[i] = P4
-			T[i] = T4
-		else:
-			P[i] = P1
-			T[i] = T1
-		
-		rho[i] = P[i]/(R*T[i])
-		u[i] = 0.0
+    #initialize primative variables
+    X = np.linspace(X_min,X_max,N)
+    for i in range(N):
+            if(X[i]<=x_bnd):
+                    P[i] = P4
+                    T[i] = T4
+            else:
+                    P[i] = P1
+                    T[i] = T1
+            
+            rho[i] = P[i]/(R*T[i])
+            u[i] = 0.0
 
-	#define the initial condition vector
-	q_init[:,0] = rho
-	q_init[:,1] = rho*u
-	q_init[:,2] = P/(gam-1.0) + 0.5*rho*u**2
+    #define the initial condition vector
+    q_init[:,0] = rho
+    q_init[:,1] = rho*u
+    q_init[:,2] = P/(gam-1.0) + 0.5*rho*u**2
 
-	return q_init,X
+    return q_init,X
 
 '''	
 #Test init_cond
@@ -96,13 +96,7 @@ def euler_1d_wavespeed(q):
     return ws
 
 import numpy as np
-# Test wave speed function 
-q,x = init_cond(-17.0,2.0,100,70e5,300,1e5,300)
-ws = euler_1d_wavespeed(q)
 
-print("ws_max = ", ws)
-
-	
 	
 def proj_to_char(q,f,q_i_ip1):
     '''
@@ -154,7 +148,7 @@ def proj_to_cons(f_char,q_cons):
 
     #compute the (conservative) flux at each point in the grid
     f_cons = np.zeros(f_char.shape)
-	N = f_char.shape[0]
+    N = f_char.shape[0]
     for i in range(N-1):
 
         #approximate state at x_{i+1/2}
@@ -178,19 +172,19 @@ def proj_to_cons(f_char,q_cons):
         R[2,1] = 0.5*u**2
         R[2,2] = c**2/(gam-1.0)+0.5*u**2+u*c
        
-		#update the boundary condition mask M
-		M = np.eye(3)
-		
-		# Solid Wall
-		if(i==3):
-			M = np.array([[1,0,0],
-						  [0,1,0],
-						  [1,0,0]])
-		# Non-Reflecting Outflow	
-		elif(i==N-4):
-			M = np.array([[0,0,0],
-						  [0,1,0],
-						  [0,0,1]])
+        #update the boundary condition mask M
+        M = np.eye(3)
+        
+        # Solid Wall
+        if(i==3):
+                M = np.array([[1,0,0],
+                              [0,1,0],
+                              [1,0,0]])
+        # Non-Reflecting Outflow	
+        elif(i==N-4):
+                M = np.array([[0,0,0],
+                              [0,1,0],
+                              [0,0,1]])
 	   
         #project flux back into conservative space (no need to project solution)
         f_cons[i,:] = (R.dot(M.dot(f_char[i,:].T))).T
@@ -205,6 +199,8 @@ def q1d_afunc(x,r,makePlot=False,demo=False):
     import matplotlib.pyplot as plt
     import numpy as np
     import sys,os
+
+    global f_num
 
     #constants
     pi = 4*np.arctan(1)
@@ -258,7 +254,8 @@ def q1d_afunc(x,r,makePlot=False,demo=False):
         plt.title(r'GALCIT Ludwieg Tube - Nozzle',fontsize=17)
         plt.legend(fontsize=12)
         plt.show()
-        sys.exit()
+        f_num += 1
+        #sys.exit()
 
     #create an interpolant for log[A(x)] 
     l_func = interp.pchip(x,np.log(pi*r**2))
@@ -287,6 +284,8 @@ def Shock_Tube_Exact(makePlots=False):
     
     '''
 
+    global f_num
+
     import matplotlib.pyplot as plt
     import numpy as np
     import sys, os
@@ -307,28 +306,25 @@ def Shock_Tube_Exact(makePlots=False):
     #normal operation or demo mode
     #if len(sys.argv) == 0:
 
-	#example initial conditions (Sod '78)
-	q_L = np.array([1, 0, 10**5/(gam-1)])
-	q_R = np.array([0.125, 0, 10**4/(gam-1)])
+    #example initial conditions (Sod '78)
+    q_L = np.array([1, 0, 10**5/(gam-1)])
+    q_R = np.array([0.125, 0, 10**4/(gam-1)])
 
-	#set domain limits
-	x_min = 0.0; x_max = 10.0
-	x = np.linspace(x_min,x_max,501)
-	x0 = (max(x)+min(x))/2
-	t = 0.0061
+    #set domain limits
+    x_min = 0.0; x_max = 10.0
+    x = np.linspace(x_min,x_max,501)
+    x0 = (max(x)+min(x))/2
+    t = 0.0061
 
-	'''
+    '''
     elif len(sys.argv) == 4:
-
         #set domain limits for provided x-vector
         x_min,x_max = min(x),max(x)
         x0 = 0
-
     else:
-
         print('\tUnrecognized number of inputs! Exiting...\n')
         sys.exit()
-	'''
+    '''
 
     #total number of points on the grid
     N = x.shape[0] 
@@ -336,17 +332,21 @@ def Shock_Tube_Exact(makePlots=False):
     #compute the acoustic speeds in the left- and right-states
     c_L = np.sqrt(gam*(gam-1)*q_L[2]/q_L[0])
     c_R = np.sqrt(gam*(gam-1)*q_R[2]/q_R[0])
+    print('c_L = %3.3f' % c_L)
+    print('c_R = %3.3f' % c_R)
 
     #compute the shock Mach number Ms using Newton-Raphson + Complex-Step Derivative
     P_41 = q_L[2]/q_R[2]
-    err = 1.0; cntr = 0; h=1e-30; Ms = 1.5
-    Res = lambda M_sh: P_41*((gam-1)/(gam+1)*(c_R/c_L)*(M_sh**2-1)/M_sh-1)**(2*gam/(gam-1))+2*gam/(gam+1)*(M_sh**2-1)+1
+    err = 1.0; cntr = 0; h=1e-30; M_sh = 1.5
+    print('P_41 = %d' % P_41)
+    Res = lambda M_sh: -P_41*(1-(gam-1)/(gam+1)*(c_R/c_L)*(M_sh**2-1)/M_sh)**(2*gam/(gam-1))+2*gam/(gam+1)*(M_sh**2-1)+1
+    print('Res(1.5) = %1.6e' % Res(1.5))
     print('Solving for shock Mach number (Ms) based on PR = P_l/P_r:')
     while (err>eps): 
         cntr += 1; Msh_p = M_sh
         M_sh -= h*Res(M_sh)/np.imag(Res(complex(M_sh,h)))
-        err = Ms/Msh_p-1
-        print('    N = %d, e = %1.6e\n' % (cntr,err))
+        err = M_sh/Msh_p-1
+        print('    N = %d, e = %1.6e' % (cntr,err))
 
         #limit total number of iterations
         if (cntr == 15):
@@ -358,7 +358,7 @@ def Shock_Tube_Exact(makePlots=False):
     x_sh = x0 + v_sh*t
     P_21 = 1.0+2*gam/(gam-1)*(M_sh**2-1)
     #if len(sys.argv) == 0:
-    print('\n\n\tM_shock = %2.3f\n\n' % M_sh)
+    print('\n\n  M_shock = %2.3f\n\n' % M_sh)
 
     #compute velocity of the contact discontinuity [m/s]
     v_ct = 2*c_L/(gam-1)*(1-(P_21/P_41)**((gam-1)/(2*gam)))
@@ -426,57 +426,42 @@ def Shock_Tube_Exact(makePlots=False):
     #plot the solution if run without arguments 
     #if len(sys.argv) == 0:
 
-	#compute the variables
-	P_plot = (gam-1)*(q_an[:,2]-q_an[:,1]**2/(2*q_an[:,0]))
-	U = q_an[:,1]/q_an[:,0]
-	Mach = np.sqrt(q_an[:,0]*U**2/(gam*P_plot))
-	T_plot = P_plot/(R*q_an[:,0])
-	c_plot = np.sqrt(gam*R*T_plot)
-	Entropy = P_plot/(q_an[:,0])**(gam)
-	e = P_plot/(gam-1)+0.5*U**2
-	str_t = 'Sod''s Shock Tube Problem (t=%1.2f)' % t
+    #compute the variables
+    P_plot = (gam-1)*(q_an[:,2]-q_an[:,1]**2/(2*q_an[:,0]))
+    U = q_an[:,1]/q_an[:,0]
+    Mach = np.sqrt(q_an[:,0]*U**2/(gam*P_plot))
+    T_plot = P_plot/(R*q_an[:,0])
+    c_plot = np.sqrt(gam*R*T_plot)
+    Entropy = P_plot/(q_an[:,0])**(gam)
+    e = P_plot/(gam-1)+0.5*U**2
+    str_t = 'Sod''s Shock Tube Problem (t=%1.3f)' % float(1000*t)
 
-	#make the figures
-	#plt.clf()
-	fig = plt.figure(f_num)
-	ax1 = fig.add_subplot(221)
-	ax1.plot(x,q_an[:,0],'-b',linewidth=3.0)
-	ax1.set_title(str_t)
-	ax1.grid()
-	ax1.xlabel(r'$x$')
-	ax1.ylabel(r'$\rho$')
-	ax1.xlim(x_min,x_max)
-	#ax1.xaxis.tick_bottom()
-	ax2 = fig.add_subplot(222)
-	ax2.plot(x,P_plot,'-b',linewidth=3.0)
-	ax2.set_title(str_t)
-	ax2.grid()
-	ax2.xlabel(r'$x$')
-	ax2.ylabel(r'$P$')
-	ax2.xlim(x_min,x_max)
-	#ax2.xaxis.tick_bottom()
-	ax3 = fig.add_subplot(223)
-	ax3.plot(x,U,'-b',linewidth=3.0)
-	ax3.set_title(str_t)
-	ax3.grid()
-	ax3.xlabel(r'$x$')
-	ax3.ylabel(r'$U$')
-	ax3.xlim(x_min,x_max)
-	#ax3.xaxis.tick_bottom()
-	ax4 = fig.add_subplot(224)
-	ax4.plot(x,Mach,'-b',linewidth=3.0)
-	ax4.set_title(str_t)
-	ax4.grid()
-	ax4.xlabel(r'$x$')
-	ax4.ylabel(r'Mach')
-	ax4.xlim(x_min,x_max)
-	#ax4.xaxis.tick_bottom()
-	fig.tight_layout()
-	plt.savefig('fig_%d.pdf' % f_num)
-	f_num += 1
+    #make the figures
+    #plt.clf()
+    fig = plt.figure(f_num)
+    ax1 = fig.add_subplot(221)
+    ax1.plot(x,q_an[:,0],'-b',linewidth=3.0)
+    ax1.set_title(str_t)
+    ax1.grid()
+    #ax1.set(xlabel='r$x$', ylabel='r$\rho$')
+    ax2 = fig.add_subplot(222)
+    ax2.plot(x,P_plot,'-b',linewidth=3.0)
+    ax2.set_title(str_t)
+    ax2.grid()
+    ax3 = fig.add_subplot(223)
+    ax3.plot(x,U,'-b',linewidth=3.0)
+    ax3.set_title(str_t)
+    ax3.grid()
+    ax4 = fig.add_subplot(224)
+    ax4.plot(x,Mach,'-b',linewidth=3.0)
+    ax4.set_title(str_t)
+    ax4.grid()
+    fig.tight_layout()
+    plt.savefig('fig_%d.pdf' % f_num)
+    f_num += 1
 
-	#show the plot(s)
-	plt.show()
+    #show the plot(s)
+    plt.show()
      
     return q_an
 
@@ -494,7 +479,14 @@ def phi_weno5():
 
     return f_hat_plus_half
 
-#attempt to plot the shoc tube geometry
-import numpy as np
+## Test wave speed function 
+#q,x = init_cond(-17.0,2.0,100,70e5,300,1e5,300)
+#ws = euler_1d_wavespeed(q)
+#print("ws_max = ", ws)
+#
+##test area ratio function
+f_num=5
 q1d_afunc(1,1,True,True)
+
+#test exact solution function
 Shock_Tube_Exact(True)
