@@ -16,29 +16,44 @@ def init_cond(X_min,X_max,N,P4,T4,P1,T1,x_bnd=0.0):
     P = np.zeros(N)
     T = np.zeros(N)
 
-    #var_lst = [rho,u,p,T]
-    #for var in var_lst: 
-    #    var = np.zeros(N)
-
     #initialize primative variables
     X = np.linspace(X_min,X_max,N)
     for i in range(N):
-            if(X[i]<=x_bnd):
-                    P[i] = P4
-                    T[i] = T4
-            else:
-                    P[i] = P1
-                    T[i] = T1
-            
-            rho[i] = P[i]/(R*T[i])
-            u[i] = 0.0
+        if(X[i]<=x_bnd):
+                P[i] = P4
+                T[i] = T4
+        else:
+                P[i] = P1
+                T[i] = T1
+        
+        rho[i] = P[i]/(R*T[i])
+        #rho[i] = np.sin((X[i]-X_min)*2*np.pi/(X_max-X_min)) + 2
+        u[i] = 0.0
 
     #define the initial condition vector
     q_init[:,0] = rho
     q_init[:,1] = rho*u
     q_init[:,2] = P/(gam-1.0) + 0.5*rho*u**2
+    
+    #assign the ghost cell values
+    for i in range(3):
+        q_init[i,0] =  q_init[6-i,0]
+        q_init[i,1] = -q_init[6-i,1]
+        q_init[i,2] =  q_init[6-i,2]
+        q_init[N-1-i,0] =  q_init[N-6+i,0]
+        q_init[N-1-i,1] = -q_init[N-6+i,1]
+        q_init[N-1-i,2] =  q_init[N-6+i,2]
+    
+    # #assign the ghost cell values
+    # q_init[0,:] = (10*-3)**10
+    # q_init[1,:] = (10*-2)**10
+    # q_init[2,:] = (10*-1)**10
+    
+    # q_init[N-1,:] = (10*3)**10
+    # q_init[N-2,:] = (10*2)**10
+    # q_init[N-3,:] = (10*1)**10
 
-    return q_init,X
+    return q_init, X
 
 '''	
 #Test init_cond
@@ -91,24 +106,110 @@ def euler_1d_wavespeed(q):
     #define max wavespeed(s) on the grid for global LF splitting
     ws = np.zeros(q.shape[1])
     for j in range(q.shape[1]):
-        ws[j] = la.norm(u+(j-1.)*c,np.inf) 
+        ws[j] = la.norm(u+(j-1)*c,np.inf) 
 
     return ws
 
 import numpy as np
 
-	
-def proj_to_char(q,f,q_i_ip1):
+def char_numerical_flux(q, f):
+
+    # Compute the state vector at the x_{1+1/2} points
+    q_i_p_half = (q[2:q.shape[0]-3,:] + q[3:q.shape[0]-2,:])*0.5
+    
+    # -------------------------------------------------------------------------
+    
+    # Number of x_{i+1/2} points on the domain at which the flux is computed
+    N_x_p_half = q_i_p_half.shape[0]
+    
+    # Number of state variables
+    Nvar = q.shape[1]
+    
+    # WENO full stencil size 
+    stencil_size = 5
+    
+    # Number of ghost points at a boundary
+    Ng = 3
+    
+    # -------------------------------------------------------------------------
+
+    # Compute the max wavespeeds
+    ws = euler_1d_wavespeed(q[Ng:q.shape[0]-Ng,:])
+
+    # Initialize the arrays
+    f_char_p = np.zeros((Nvar, stencil_size))
+    f_char_m = np.zeros((Nvar, stencil_size))
+    f_char_i_p_half = np.zeros((N_x_p_half, Nvar))
+    
+    # Loop through each x_{i+1/2} point on the grid
+    # Compute the f_char_p and f_char_m terms for phi_weno5
+    # Compute the fifth order accurate weno flux-split terms
+    # Add them together to obatin to find f_char_i_p_half
+    for i in range(N_x_p_half):
+        qi, fi = proj_to_char(q[i:i+stencil_size+1,:], f[i:i+stencil_size+1,:], q_i_p_half[i])
+        
+        for j in range(stencil_size):
+            f_char_p[0:Nvar, j] = (0.5*( (fi[j,:]).T + (np.diag(ws)).dot((qi[j,:]).T) )).T
+            f_char_m[0:Nvar, j] = (0.5*( (fi[j+1,:]).T - (np.diag(ws)).dot((qi[j+1,:]).T) )).T
+
+        # Compute the i + 1/2 points flux
+        for k in range(0, Nvar):
+            f_char_i_p_half[i,k] = phi_weno5(f_char_p[k, :],0) + phi_weno5(f_char_m[k, ::-1],1)
+            if(np.abs(f_char_i_p_half[i,k])>10**8):
+                print("i = ",i," s = ",k," total number of x_{i+1/2} points = ",N_x_p_half)
+            
+    return f_char_i_p_half
+
+
+def phi_weno5(f_char_p_s,flg):
+    
+    f_i_m_2 = f_char_p_s[0]
+    f_i_m_1 = f_char_p_s[1]
+    f_i     = f_char_p_s[2]
+    f_i_p_1 = f_char_p_s[3]
+    f_i_p_2 = f_char_p_s[4]
+    
+    f0 = (1/3)*f_i_m_2 - (7/6)*f_i_m_1 + (11/6)*f_i
+    f1  = (-1/6)*f_i_m_1 + (5/6)*f_i + (1/3)*f_i_p_1
+    f2  = (1/3)*f_i + (5/6)*f_i_p_1 - (1/6)*f_i_p_2
+    
+    beta_0 = (13/12)*(f_i_m_2 - 2*f_i_m_1 + f_i)**2 + (1/4)*(f_i_m_2 - 4*f_i_m_1 + 3*f_i)**2
+    beta_1 = (13/12)*(f_i_m_1 - 2*f_i + f_i_p_1)**2 + (1/4)*(f_i_m_1 - f_i_p_1)**2
+    beta_2 = (13/12)*(f_i - 2*f_i_p_1 + f_i_p_2)**2 + (1/4)*(3*f_i - 4*f_i_p_1 + f_i_p_2)**2
+    
+    ep = 1e-6
+    
+    w0_tilde = 0.1/(ep + beta_0)**2
+    w1_tilde = 0.6/(ep + beta_1)**2
+    w2_tilde = 0.3/(ep + beta_2)**2
+    
+    w0 = w0_tilde/(w0_tilde + w1_tilde + w2_tilde)
+    w1 = w1_tilde/(w0_tilde + w1_tilde + w2_tilde)
+    w2 = w2_tilde/(w0_tilde + w1_tilde + w2_tilde)
+    
+    f_char_i_p_half_p_s = w0*f0 + w1*f1 + w2*f2
+    
+    if(np.abs(f_char_i_p_half_p_s)>10**8):
+        print("f_char_p_s[0] = ",f_char_p_s[0]," flux direction = ",flg)
+        print("f_char_p_s[1] = ",f_char_p_s[1])
+        print("f_char_p_s[2] = ",f_char_p_s[2])
+        print("f_char_p_s[3] = ",f_char_p_s[3])
+        print("f_char_p_s[0] = ",f_char_p_s[4])
+        print(" --- ")
+        # print("w0 = ",w0," f0 = ",f0," flux direction = ",flg) 
+        # print("w1 = ",w1," f1 = ",f1)         
+        # print("w2 = ",w2," f2 = ",f2) 
+        
+    return f_char_i_p_half_p_s
+    
+def proj_to_char(q,f,q_st):
     '''
     q is a nsxnv matrix of conservative variables (ns = num pts in current stencil)  
     f is a nsxnv matrix of conservative fluxes (ns = num pts in current stencil)  
-    q_i_ip1 is a 2xnv matrix with nv variables to compute average state 
+    q_st is a 2xnv matrix with nv variables to compute average state 
 
     '''
     import numpy as np
-
-    #approximate state at x_{i+1/2}
-    q_st = 0.5*(q_i_ip1[0,:]+q_i_ip1[1,:]) 
 
     #primitive variables at x_{i+1/2}
     gam = 1.4
@@ -145,6 +246,9 @@ def proj_to_cons(f_char,q_cons):
 
     '''
     import numpy as np
+    
+    # Compute the state vector at the x_{1+1/2} points
+    q_i_p_half = (q_cons[2:q_cons.shape[0]-3,:] + q_cons[3:q_cons.shape[0]-2,:])*0.5
 
     #compute the (conservative) flux at each point in the grid
     f_cons = np.zeros(f_char.shape)
@@ -152,7 +256,7 @@ def proj_to_cons(f_char,q_cons):
     for i in range(N-1):
 
         #approximate state at x_{i+1/2}
-        q_st = 0.5*(q_cons[i,:]+q_cons[i+1,:]) 
+        q_st = q_i_p_half[i]
 
         #primitive variables at x_{i+1/2}
         gam = 1.4
@@ -185,6 +289,9 @@ def proj_to_cons(f_char,q_cons):
                 M = np.array([[0,0,0],
                               [0,1,0],
                               [0,0,1]])
+        
+        #for debugging
+        M = np.eye(3)
 	   
         #project flux back into conservative space (no need to project solution)
         f_cons[i,:] = (R.dot(M.dot(f_char[i,:].T))).T
@@ -233,10 +340,10 @@ def q1d_afunc(x,r,makePlot=False,demo=False):
                           [2.000000,   0.0579985]])
             x,r = X[:,0],X[:,1]
 
-        #use LaTeX formatting for titles and axes
-        plt.rc('text', usetex=True)
-        plt.rc('font', family='serif')
-        plt.rcParams['figure.figsize'] = (10.0,6.0)
+        ##use LaTeX formatting for titles and axes
+        #plt.rc('text', usetex=True)
+        #plt.rc('font', family='serif')
+        #plt.rcParams['figure.figsize'] = (10.0,6.0)
 
         #plot the discrete points and the phcip spline
         plt.figure()
@@ -465,19 +572,7 @@ def Shock_Tube_Exact(makePlots=False):
      
     return q_an
 
-def phi_weno5():
-    '''
-    Function which computes the 5th order WENO reconstruction for the flux at x_{i+1/2}
 
-    q is a nsxnv matrix of conservative variables (ns = num pts in current stencil)  
-    f is a nsxnv matrix of conservative fluxes (ns = num pts in current stencil)  
-    q_i_ip1 is a 2xnv matrix with nv variables to compute average state 
-
-    '''
-
-
-
-    return f_hat_plus_half
 
 ## Test wave speed function 
 #q,x = init_cond(-17.0,2.0,100,70e5,300,1e5,300)
@@ -485,8 +580,8 @@ def phi_weno5():
 #print("ws_max = ", ws)
 #
 ##test area ratio function
-f_num=5
-q1d_afunc(1,1,True,True)
+# f_num=5
+# q1d_afunc(1,1,True,True)
 
-#test exact solution function
-Shock_Tube_Exact(True)
+# #test exact solution function
+# Shock_Tube_Exact(True)
