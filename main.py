@@ -32,18 +32,18 @@ plt.rcParams['figure.figsize'] = (10.0,5.625)
 
 os.system('clear')
 eps = np.finfo('float').eps
-gam = 1.40
+gam = 1.4
 R = 286.9
 
 # Specify the number of points in the domain (includes ghost points)
-N = 500
+N = 1500
 
 # Specify the domain size
 X_min,X_max = -17.0,3.0
 
 # Specifiy CFL and total number of time steps
 CFL = 5e-4
-Nt = 600
+Nt = 250
 
 # Specify the Pressure and temperature values of the initial condition
 P1 = 1e4
@@ -79,6 +79,7 @@ if (runQuasi1D):
                          [0.543973,   0.0579985],
                          [0.700000,   0.0579985],
                          [2.000000,   0.0579985]])
+    x_throat = 0.0828279
 
     #compute scaling factor (vector) for Quasi-1D source term on the grid "X"
     F_vec = areaFunc(Geom_Dat[:,0],Geom_Dat[:,1],X[3:-3],True)
@@ -97,6 +98,11 @@ T_final = Nt*dt
 #compute the exact solution for the 1D shock-tube problem
 t_exact = np.linspace(0,T_final,Nt+1)
 Q_exact = Shock_Tube_Exact(X_min,X_max,X.shape[0],P4,T4,P1,T1,t_exact)
+rho_ex = Q_exact[3:-3,0,:]
+u_ex = Q_exact[3:-3,1,:]/rho_ex
+e_ex = Q_exact[3:-3,2,:]
+p_ex = (gam-1.0)*(e_ex-0.5*rho_ex*u_ex**2)
+M_ex = np.sqrt(rho_ex*u_ex**2/(gam*p_ex))
 
 #allocate arrays for updating the solution
 q = np.copy(q_init)
@@ -104,20 +110,31 @@ Q = np.zeros((q.shape[0]-6,q.shape[1],Nt+1))            #<-stored history
 Q[:,:,0] = q_init[3:-3,:]
 q1,q2 = np.zeros(q.shape),np.zeros(q.shape)
 
+rho_plt = q[3:-3,0]
+u_plt = q[3:-3,1]/rho_plt
+e_plt = q[3:-3,2]
+p_plt = (gam-1.0)*(e_plt-0.5*rho_plt*u_plt**2)
+M_plt = np.sqrt(rho_plt*u_plt**2/(gam*p_plt))
+
 #real-time animation  
 plt.ion()
 plt.figure()
-if(not runQuasi1D):
-    line1, = plt.plot(X[3:N-3],Q_exact[3:N-3,0,0],'-k',linewidth=1.0,label='Exact Solution')
-    plt.title('1D Euler Equations Using WENO-JS (t=%2.3f[ms])' % 0.0)
-else:
+if(runQuasi1D):
     plt.title('Quasi-1D Euler Equations Using WENO-JS (t=%2.3f[ms])' % 0.0)
-line2, = plt.plot(X[3:N-3],q_init[3:N-3,0],'ob',label='WENO-JS')
-plt.xlabel('x')
-plt.ylabel('rho')
-plt.xlim(-3,3)
-plt.ylim(0,1.4)
-plt.legend()
+    plt.plot(x_throat*np.ones(2),[-10,10],'--k',linewidth=1.5)
+    plt.plot(50*np.array([-1,1]),[1.0,1.0],'--k',linewidth=1.5)
+    line2, = plt.plot(X[3:N-3],M_plt,'-b',label='WENO-JS',linewidth=3.0)
+    plt.ylabel('Mach')
+    plt.ylim(0,5.0)
+else:
+    line1, = plt.plot(X[3:N-3],Q_exact[3:N-3,0,0],'-k',linewidth=1.0,label='Exact Solution')
+    line2, = plt.plot(X[3:N-3],q_init[3:N-3,0],'ob',label='WENO-JS')
+    plt.title('1D Euler Equations Using WENO-JS (t=%2.3f[ms])' % 0.0)
+    plt.ylabel('rho')
+    plt.ylim(0,2.0)
+    plt.legend()
+plt.xlabel('x[m]')
+plt.xlim(-0.1,0.7)
 plt.draw()
 plt.savefig('frames/frame%08d.png' % 0)
 plt.show()
@@ -147,14 +164,22 @@ for i in range(1,Nt+1):
     #update the stored history
     Q[:,:,i] = q[3:-3,:]
 
+    #compute and store the primitive variables
+    rho_plt = q[3:-3,0]
+    u_plt = q[3:-3,1]/rho_plt
+    e_plt = q[3:-3,2]
+    p_plt = (gam-1.0)*(e_plt-0.5*rho_plt*u_plt**2)
+    M_plt = np.sqrt(rho_plt*u_plt**2/(gam*p_plt))
+
     #real-time animation   
     if(i%plot_freq==0):
-        if(not runQuasi1D): 
-            line1.set_ydata(Q_exact[3:N-3,0,i])
-            plt.title('1D Euler Equations Using WENO-JS (t=%2.3f[ms])' % float(1000*i*dt))
-        else:
+        if(runQuasi1D): 
             plt.title('Quasi-1D Euler Equations Using WENO-JS (t=%2.3f[ms])' % float(1000*i*dt))
-        line2.set_ydata(q[3:N-3,0])
+            line2.set_ydata(M_plt)
+        else:
+            line1.set_ydata(Q_exact[3:N-3,0,i])
+            line2.set_ydata(q[3:N-3,0])
+            plt.title('1D Euler Equations Using WENO-JS (t=%2.3f[ms])' % float(1000*i*dt))
         plt.draw()
         if (saveFrames): plt.savefig('frames/frame%08d.png' % int(i/plot_freq))
         plt.pause(eps)
