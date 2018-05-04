@@ -18,22 +18,25 @@ import matplotlib.animation as animation
 from time import sleep
 import sys,os
 
-# Import the helper functions
+# Import library functions
 from euler_1d_weno import *
 
 os.system('clear')
+eps = np.finfo('float').eps
+gam = 7.0/5.0
+R = 286.9
 
 # Specify the number of points in the domain (includes ghost points)
-N = 150
+N = 500
 
 # Specify the domain size
-X_min,X_max = -2,2
+X_min,X_max = -17.0,3.0
 
 # Step size
 dx = (X_max-X_min)/(N-1)
 
 # Choose CFL
-CFL = 0.0005
+CFL = 5e-4
 
 # Select the time step
 dt = CFL*dx
@@ -49,14 +52,21 @@ Nt = 600
 T_final = Nt*dt 
 
 # Specify the Pressure and temperature values of the initial condition
-P1 = 1e5
-P4 = 70e5
+P1 = 1e4
+P4 = 1e5
 T1 = 300
 T4 = 300
 
+#example initial conditions (Sod '78)
+rho4 = 1
+P4 = 1e5
+T4 = P4/(R*rho4)
+rho1 = 0.125
+P1 = 1e4
+T1 = P1/(R*rho1)
+
 #f_num = 1
 #q1d_afunc(1,1,True,True)
-
 
 
 # [STEP 1]: Assign the initial condition (diaphram at x = 0; Ghost cells populated with large discontinuity)
@@ -71,23 +81,26 @@ Q = np.zeros((q.shape[0]-6,q.shape[1],Nt+1))            #<-stored history
 Q[:,:,0] = q[3:-3,:]
 q1,q2 = np.zeros(q.shape),np.zeros(q.shape)
 print('Starting time integration...')
-#real-time animation   
 
+#real-time animation  
 plt.ion()
 plt.figure()
 plt.show()
-line1, = plt.plot(X[3:N-3],Q_exact[3:N-3,0,0],'--k',linewidth=1.0,label='Exact Solution')
+line1, = plt.plot(X[3:N-3],Q_exact[3:N-3,0,0],'-k',linewidth=1.0,label='Exact Solution')
 line2, = plt.plot(X[3:N-3],q_init[3:N-3,0],'ob',label='WENO-JS')
-plt.title('Quasi-1D Euler Equations Using WENO-JS')
+plt.title('Quasi-1D Euler Equations Using WENO-JS (t=%2.3f[ms])' % 0.0)
 plt.xlabel('x')
 plt.ylabel('rho')
+plt.xlim(-3,3)
 plt.legend()
-#sleep(1)
 plt.draw()
-#sleep(1)
+plt.pause(eps)
+
+#start the time integration
+plot_freq = 10 
 for i in range(1,Nt+1):
 
-    print('n = %d,\tt = %2.6f [ms]' % (i,i*dt))
+    print('n = %d,    t = %2.6f [ms]' % (i,float(1000*i*dt)))
     
     # Third-order TVD Scheme (Shu '01)
     q = update_ghost_pts(X,q)
@@ -106,17 +119,12 @@ for i in range(1,Nt+1):
     Q[:,:,i] = q[3:-3,:]
 
     #real-time animation   
-    line1.set_ydata(Q_exact[3:N-3,0,i])
-    line2.set_ydata(q[3:N-3,0])
-    plt.draw()
-    plt.pause(1e-5)
-
-
-# #animate the solution
-# # --------------------------------------------------
-
-# plt.show()
-# # -------------------------------------------------- 
+    if(i%plot_freq==0):
+        line1.set_ydata(Q_exact[3:N-3,0,i])
+        line2.set_ydata(q[3:N-3,0])
+        plt.title('Quasi-1D Euler Equations Using WENO-JS (t=%2.3f[ms])' % float(1000*i*dt))
+        plt.draw()
+        plt.pause(eps)
 
 fig, ax = plt.subplots()
 line, = ax.plot(X[3:N-3],Q[:,0,0], color='b', marker='o', linewidth=2)
@@ -129,7 +137,6 @@ plt.title(r'Density Animation')
 def animate(n):
     line.set_ydata(Q[:,0,n])
     return line,
-
 ani = animation.FuncAnimation(fig, animate, np.arange(1, Nt),interval=20, blit=True)
 plt.show()  
     

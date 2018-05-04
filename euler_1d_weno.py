@@ -475,8 +475,7 @@ def Shock_Tube_Exact(x_min,x_max,N,P4,T4,P1,T1,time,mode='data'):
 
         #set domain limits
         x = np.linspace(x_min,x_max,N)
-        x0 = (max(x)+min(x))/2
-
+        x0 = 0.0
         #defensive programming
         if np.isscalar(time):
             t_vec = np.array([time])
@@ -654,7 +653,3 @@ f_num = 1
 #
 ##test area ratio function
 
-
-#test the exact solution
-#import numpy as np
-#Shock_Tube_Exact(-1,1,50,70e5,300,1e5,300,np.linspace(0.0,3e-3,5),mode='testing')
