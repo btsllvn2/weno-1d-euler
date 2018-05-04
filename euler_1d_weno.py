@@ -229,6 +229,9 @@ def phi_weno5(f_char_p_s,flg):
     w1 = w1_tilde/(w0_tilde + w1_tilde + w2_tilde)
     w2 = w2_tilde/(w0_tilde + w1_tilde + w2_tilde)
     
+    #hardcode optimal linear weights
+    #w0 = 0.1; w1 = 0.6; w2 = 0.3;
+    
     #print('%d\t%3.4f\t%3.4f\t%3.4f' % (flg,w0,w1,w2))
     
     f_char_i_p_half_p_s = w0*f0 + w1*f1 + w2*f2
@@ -326,7 +329,7 @@ def spatial_rhs(f_char,q_cons,dx):
         
         #update the boundary condition mask M
         M = np.eye(3) 
-        if(i==N-2): M[0,0] = 0
+        #if(i==N-2): M[0,0] = 0
         
         # Local Right Eigen Matrices
         R_p_half = R[i+1,:,:]
@@ -628,16 +631,11 @@ def Shock_Tube_Exact(x_min,x_max,N,P4,T4,P1,T1,time,mode='data'):
     return q_an
 
 
-
+f_num = 1
 ## Test wave speed function 
 #q,x = init_cond(-17.0,2.0,100,70e5,300,1e5,300)
 #ws = euler_1d_wavespeed(q)
 #print("ws_max = ", ws)
 #
 ##test area ratio function
-#f_num=1
-# q1d_afunc(1,1,True,True)
-
-#test exact solution function
-#Shock_Tube_Exact(-1,1,50,70e5,300,1e5,300,1e-3,'demo')
 

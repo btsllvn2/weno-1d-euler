@@ -23,7 +23,7 @@ from euler_1d_weno import *
 os.system('clear')
 
 # Specify the number of points in the domain (includes ghost points)
-N = 300
+N = 150
 
 # Specify the domain size
 X_min,X_max = -2,2
@@ -49,6 +49,13 @@ P1 = 1e5
 P4 = 70e5
 T1 = 300
 T4 = 300
+
+#f_num = 1
+#q1d_afunc(1,1,True,True)
+
+#test exact solution function
+#Shock_Tube_Exact(-1,1,N,P4,T4,P1,T1,1e-3,'demo')
+#plt.show()
 
 # [STEP 1]: Assign the initial condition (diaphram at x = 0; Ghost cells populated with large discontinuity)
 q_init,X = init_cond(X_min,X_max,N,P4,T4,P1,T1)
