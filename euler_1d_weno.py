@@ -44,7 +44,7 @@ def init_cond(X_min,X_max,N,P4,T4,P1,T1,x_bnd=0.0):
 
     print('Intiial condition generated successfully.')
     
-    return q_init, X
+    return q_init, X, dx
 
 def phys_flux(q):
 #q is an Nxnv matrix with N grid points and nv variables   
@@ -194,8 +194,8 @@ def phi_weno5(f_char_p_s,flg):
     '''
     Function which computes a 5th-order WENO reconstruction of the numerical
     flux at location x_{i+1/2}, works regardless of the sign of f'(u)
-
     '''
+
     import numpy as np
    
     #assign the fluxes at each point in the full stencil 
@@ -229,7 +229,7 @@ def phi_weno5(f_char_p_s,flg):
     #hardcode optimal linear weights
     #w0 = 0.1; w1 = 0.6; w2 = 0.3;
    
-    #linear convex combination of (3) substencil
+    #linear convex combination of (3) substencil reconstructions
     f_char_i_p_half_p_s = w0*f0 + w1*f1 + w2*f2
     
     return f_char_i_p_half_p_s
@@ -431,7 +431,7 @@ def Shock_Tube_Exact(X,P4,T4,P1,T1,time,mode='data'):
         P1      = Driven pressure [Pa]
         T1      = Driven temperature [K]
         time    = Solution time (vector or scalar) [s]
-        demo    = Boolean flag for running in demo mode
+        demo    = Flag for running the code in demo mode
                                                                     
     ================================================================
     '''
@@ -474,8 +474,7 @@ def Shock_Tube_Exact(X,P4,T4,P1,T1,time,mode='data'):
         q_R = np.array([rho_1, 0, P1/(gam-1)])
 
         #set domain limits
-        x0 = 0.0
-        x = X
+        x0 = 0.0; x = X
         #defensive programming
         if np.isscalar(time):
             t_vec = np.array([time])

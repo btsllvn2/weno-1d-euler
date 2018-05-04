@@ -49,7 +49,7 @@ N = 1000
 X_min,X_max = -17.0,1.0
 
 # Specifiy CFL and total number of time steps
-CFL = 5e-4
+CFL = 0.5
 Nt = 300
 
 # Specify the Pressure and temperature values of the initial condition
@@ -66,8 +66,12 @@ rho1 = 0.125
 P1 = 1e4
 T1 = P1/(R*rho1)
 
+#compute maximum possible velocity for initial temperature
+u_max = np.sqrt(2*gam*R*max(T4,T1)/(gam-1))
+print('Maximum possible velocity on domain: u_max = %4.3f [m/s]' % u_max)
+
 # [STEP 1]: Assign the initial condition (diaphram at x = 0; Ghost cells populated with large discontinuity)
-q_init,X = init_cond(X_min,X_max,N,P4,T4,P1,T1)
+q_init,X,dx = init_cond(X_min,X_max,N,P4,T4,P1,T1)
 #run the code either in quasi-1D mode or in true 1D mode
 if (runQuasi1D):
 
@@ -96,8 +100,7 @@ else:
     F_vec = np.zeros(X[3:-3].shape)
 
 #determine the time parameters
-dx = X[1]-X[0]
-dt = CFL*dx
+dt = CFL*dx/u_max
 T_final = Nt*dt 
 
 #compute the exact solution for the 1D shock-tube problem
@@ -141,7 +144,6 @@ else:
     #plt.ylim(0,2.0)
     plt.legend()
 plt.xlabel('x[m]')
-#if (realtimeAnimate): plt.draw()
 plt.savefig('frames/frame%08d.png' % 0)
 plt.pause(eps)
 
@@ -185,7 +187,6 @@ for i in range(1,Nt+1):
             line1.set_ydata(Q_exact[3:N-3,0,i])
             line2.set_ydata(q[3:N-3,0])
             plt.title('1D Euler Equations Using WENO-JS (t=%2.3f[ms])' % float(1000*i*dt))
-        #if (realtimeAnimate): plt.draw()
         if (saveFrames): plt.savefig('frames/frame%08d.png' % int(i/plot_freq))
         plt.pause(eps)
 
