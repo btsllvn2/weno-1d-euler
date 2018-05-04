@@ -16,8 +16,15 @@ def init_cond(X_min,X_max,N,P4,T4,P1,T1,x_bnd=0.0):
     P = np.zeros(N)
     T = np.zeros(N)
 
+    #define the grid with N total points (ghost points outside domain)
+    X = np.zeros(N)
+    X[3:-3] = np.linspace(X_min,X_max,N-6)
+    dx = X[4]-X[3]
+    for i in range(3):
+        X[i] = X_min+(i-3)*dx
+        X[-(i+1)] = X_max+(3-i)*dx 
+
     #initialize primative variables
-    X = np.linspace(X_min,X_max,N)
     for i in range(N):
         if(X[i]<=x_bnd):
                 P[i] = P4
@@ -331,7 +338,7 @@ def q1d_rhs(f_vec,q):
     e = q[:,2]
     p = (gam-1.0)*(e-0.5*rho*u**2)
 
-    #compute the unscalex Q1D source term
+    #compute the unscaled Q1D source term
     flux = np.zeros(q.shape)
     flux[:,0] = rho*u
     flux[:,1] = rho*u**2
@@ -404,16 +411,9 @@ def areaFunc(x,r,X_vec,makePlot=False,demo=False):
     l_func = interp.pchip(x,np.log(np.pi*r**2))
     F_vec = l_func.__call__(X_vec,1)
 
-    ##output the derivative to the screen
-    #print('  First derivative of log[A(x)] function:\n')
-    #print(' x[m]\tArea_Derivative')
-    #print('==========================================\n')
-    #for i in range(X_vec.shape[0]):
-    #    print('%3.4f\t%3.5f' % (X_vec[i],F_vec[i]))
-
     return F_vec
 
-def Shock_Tube_Exact(x_min,x_max,N,P4,T4,P1,T1,time,mode='data'):
+def Shock_Tube_Exact(X,P4,T4,P1,T1,time,mode='data'):
     '''
     ================================================================
                                                                     
@@ -474,8 +474,8 @@ def Shock_Tube_Exact(x_min,x_max,N,P4,T4,P1,T1,time,mode='data'):
         q_R = np.array([rho_1, 0, P1/(gam-1)])
 
         #set domain limits
-        x = np.linspace(x_min,x_max,N)
         x0 = 0.0
+        x = X
         #defensive programming
         if np.isscalar(time):
             t_vec = np.array([time])

@@ -11,19 +11,26 @@
 #============================
 
 # Import the libraries that you need
+from euler_1d_weno import *
 import numpy as np
 import scipy.linalg as la 
-import matplotlib.pyplot as plt
-import matplotlib.animation as animation
-from time import sleep
 import sys,os
 
-# Import library functions
-from euler_1d_weno import *
+#========================================
+#
+#  Main options for running the code:
+#
+#========================================
+noDisplay = False
+saveFrames = False
+runQuasi1D = False
 
-#options for running the code
-saveFrames = True
-runQuasi1D = True
+#supress display output
+if (noDisplay):
+    import matplotlib
+    matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+import matplotlib.animation as animation
 
 #use LaTeX formatting for titles and axes
 plt.rc('text', usetex=True)
@@ -36,14 +43,14 @@ gam = 1.4
 R = 286.9
 
 # Specify the number of points in the domain (includes ghost points)
-N = 1500
+N = 1000
 
 # Specify the domain size
-X_min,X_max = -17.0,3.0
+X_min,X_max = -17.0,1.0
 
 # Specifiy CFL and total number of time steps
 CFL = 5e-4
-Nt = 250
+Nt = 300
 
 # Specify the Pressure and temperature values of the initial condition
 P1 = 1e4
@@ -83,12 +90,10 @@ if (runQuasi1D):
 
     #compute scaling factor (vector) for Quasi-1D source term on the grid "X"
     F_vec = areaFunc(Geom_Dat[:,0],Geom_Dat[:,1],X[3:-3],True)
-    print('Q1D shape(F_vec) = ',F_vec.shape)
 else:
 
     #force the Q1D source term to be identically zero
     F_vec = np.zeros(X[3:-3].shape)
-    print('1D shape(F_vec) = ',F_vec.shape)
 
 #determine the time parameters
 dx = X[1]-X[0]
@@ -97,7 +102,7 @@ T_final = Nt*dt
 
 #compute the exact solution for the 1D shock-tube problem
 t_exact = np.linspace(0,T_final,Nt+1)
-Q_exact = Shock_Tube_Exact(X_min,X_max,X.shape[0],P4,T4,P1,T1,t_exact)
+Q_exact = Shock_Tube_Exact(X,P4,T4,P1,T1,t_exact)
 rho_ex = Q_exact[3:-3,0,:]
 u_ex = Q_exact[3:-3,1,:]/rho_ex
 e_ex = Q_exact[3:-3,2,:]
@@ -125,19 +130,19 @@ if(runQuasi1D):
     plt.plot(50*np.array([-1,1]),[1.0,1.0],'--k',linewidth=1.5)
     line2, = plt.plot(X[3:N-3],M_plt,'-b',label='WENO-JS',linewidth=3.0)
     plt.ylabel('Mach')
-    plt.ylim(0,5.0)
+    plt.xlim(-0.1,0.7)
+    plt.ylim(0,6.0)
 else:
     line1, = plt.plot(X[3:N-3],Q_exact[3:N-3,0,0],'-k',linewidth=1.0,label='Exact Solution')
     line2, = plt.plot(X[3:N-3],q_init[3:N-3,0],'ob',label='WENO-JS')
     plt.title('1D Euler Equations Using WENO-JS (t=%2.3f[ms])' % 0.0)
     plt.ylabel('rho')
-    plt.ylim(0,2.0)
+    plt.xlim(-1,1)
+    #plt.ylim(0,2.0)
     plt.legend()
 plt.xlabel('x[m]')
-plt.xlim(-0.1,0.7)
-plt.draw()
+#if (realtimeAnimate): plt.draw()
 plt.savefig('frames/frame%08d.png' % 0)
-plt.show()
 plt.pause(eps)
 
 #time integration
@@ -180,15 +185,12 @@ for i in range(1,Nt+1):
             line1.set_ydata(Q_exact[3:N-3,0,i])
             line2.set_ydata(q[3:N-3,0])
             plt.title('1D Euler Equations Using WENO-JS (t=%2.3f[ms])' % float(1000*i*dt))
-        plt.draw()
+        #if (realtimeAnimate): plt.draw()
         if (saveFrames): plt.savefig('frames/frame%08d.png' % int(i/plot_freq))
         plt.pause(eps)
 
-plt.show()
-
 fig, ax = plt.subplots()
 line, = ax.plot(X[3:N-3],Q[:,0,0], color='b', marker='o', linewidth=2)
-
 #ax.grid(ydata=[0], color='b', linestyle='-', linewidth=1)
 plt.xlabel(r'$x$')
 plt.ylabel(r'$\rho(x,t)$')
