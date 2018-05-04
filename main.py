@@ -15,6 +15,7 @@ import numpy as np
 import scipy.linalg as la 
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
+from time import sleep
 import sys,os
 
 # Import the helper functions
@@ -38,11 +39,14 @@ CFL = 0.0005
 dt = CFL*dx
 
 # Select total test time
-Total_Test_Time = 5e-3
+#Total_Test_Time = 5e-3
 
 # Number of time steps
 #Nt = round((Total_Test_Time)/dt)
 Nt = 600
+
+#final test time
+T_final = Nt*dt 
 
 # Specify the Pressure and temperature values of the initial condition
 P1 = 1e5
@@ -53,19 +57,24 @@ T4 = 300
 #f_num = 1
 #q1d_afunc(1,1,True,True)
 
-#test exact solution function
-#Shock_Tube_Exact(-1,1,N,P4,T4,P1,T1,1e-3,'demo')
-#plt.show()
+
 
 # [STEP 1]: Assign the initial condition (diaphram at x = 0; Ghost cells populated with large discontinuity)
 q_init,X = init_cond(X_min,X_max,N,P4,T4,P1,T1)
-print('intiial condition generated')
+
+#compute the exact solution for the 1D shock-tube problem
+t_exact = np.linspace(0,T_final,Nt+1)
+Q_exact = Shock_Tube_Exact(X_min,X_max,X.shape[0],P4,T4,P1,T1,t_exact)
+#plt.show()
+
+sys.exit()
+
 q = np.copy(q_init)
 Q = np.zeros((q.shape[0]-6,q.shape[1],Nt+1))            #<-stored history
 Q[:,:,0] = q[3:-3,:]
 q1,q2 = np.zeros(q.shape),np.zeros(q.shape)
 print('Entering time loop...')
-for i in range(1,Nt):
+for i in range(1,Nt+1):
 
     print('n = %d, t = %2.6f [ms]' % (i,i*dt))
     

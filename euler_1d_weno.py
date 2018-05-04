@@ -34,6 +34,10 @@ def init_cond(X_min,X_max,N,P4,T4,P1,T1,x_bnd=0.0):
     q_init[:,0] = rho
     q_init[:,1] = rho*u
     q_init[:,2] = P/(gam-1.0) + 0.5*rho*u**2
+
+
+    print('Intiial condition generated successfully.')
+
     
     return q_init, X
 
@@ -424,7 +428,7 @@ def Shock_Tube_Exact(x_min,x_max,N,P4,T4,P1,T1,time,mode='data'):
         T4      = Driver temperature [K]
         P1      = Driven pressure [Pa]
         T1      = Driven temperature [K]
-        time    = Solution time [s]
+        time    = Solution time (vector or scalar) [s]
         demo    = Boolean flag for running in demo mode
                                                                     
     ================================================================
@@ -436,6 +440,7 @@ def Shock_Tube_Exact(x_min,x_max,N,P4,T4,P1,T1,time,mode='data'):
     import matplotlib.pyplot as plt
     import numpy as np
     import sys, os
+    from time import sleep
 
     #define constants
     eps = np.finfo(float).eps
@@ -458,7 +463,8 @@ def Shock_Tube_Exact(x_min,x_max,N,P4,T4,P1,T1,time,mode='data'):
         #set domain limits
         x = np.linspace(-1.0,1.0,501)
         x0 = 0.0
-        t = 1e-3
+        t_vec = np.array([1e-3])
+
     else:
 
         #left and right state vectors
@@ -470,7 +476,12 @@ def Shock_Tube_Exact(x_min,x_max,N,P4,T4,P1,T1,time,mode='data'):
         #set domain limits
         x = np.linspace(x_min,x_max,N)
         x0 = (max(x)+min(x))/2
-        t = time
+
+        #defensive programming
+        if np.isscalar(time):
+            t_vec = np.array([time])
+        else:
+            t_vec = np.array(time)
 
     #total number of points on the grid
     N = x.shape[0] 
@@ -479,12 +490,12 @@ def Shock_Tube_Exact(x_min,x_max,N,P4,T4,P1,T1,time,mode='data'):
     c_L = np.sqrt(gam*(gam-1)*q_L[2]/q_L[0])
     c_R = np.sqrt(gam*(gam-1)*q_R[2]/q_R[0])
 
-    #compute the shock Mach number Ms using Newton-Raphson + Complex-Step Derivative
+    #solve the shock-tube equation using Newton-Raphson + Complex-Step Derivative
     P_41 = q_L[2]/q_R[2]
     err = 1.0; cntr = 0; h=1e-30; M_sh = 1.5
     #print('P_41 = %d' % P_41)
     Res = lambda M_sh: -P_41*(1-(gam-1)/(gam+1)*(c_R/c_L)*(M_sh**2-1)/M_sh)**(2*gam/(gam-1))+2*gam/(gam+1)*(M_sh**2-1)+1
-    print('Solving for shock Mach number (M_sh) based on P_41=%3.1f:' % P_41)
+    print('Solving the shock tube equation for P_41=%3.1f:' % P_41)
     while (err>eps): 
         cntr += 1; Msh_p = M_sh
         M_sh -= h*Res(M_sh)/np.imag(Res(complex(M_sh,h)))
@@ -496,140 +507,144 @@ def Shock_Tube_Exact(x_min,x_max,N,P4,T4,P1,T1,time,mode='data'):
             print('\n  **Iteration limit exceeded (e = %1.6e)\n' % err)
             break
 
-    #compute shock velocity [m/s] and static pressure-jump P_21 = P2/P1
-    v_sh = M_sh*c_R
-    x_sh = x0 + v_sh*t
-    P_21 = 1.0+2*gam/(gam+1)*(M_sh**2-1)
-    #if len(sys.argv) == 0:
-    #print('\n  M_shock = %2.3f' % M_sh)
-    #print('\n  P_21 = %3.3f' % P_21)
-
-    #compute velocity of the contact discontinuity [m/s]
-    v_ct = 2*c_L/(gam-1)*(1-(P_21/P_41)**((gam-1)/(2*gam)))
-    x_ct = x0 + v_ct*t
-    u3 = v_ct; u2 = v_ct
-
-    #compute sound speeds in Regions 2 and 3
-    c2 = c_R*np.sqrt(P_21*(2+(gam-1)*M_sh**2)/((gam+1)*M_sh**2))
-    c3 = c_L*(P_21/P_41)**((gam-1)/(2*gam))
-    #print('\n  c2 = %3.3f' % c2)
-    #print('\n  c3 = %3.3f' % c3)
-
-    #compute velocity of left and right sides of the expansion fan
-    v_fL = -c_L
-    x_fL = x0 + v_fL*t
-    v_fR = u2-c3
-    x_fR = x0 + v_fR*t
-
-    #write out the solution
-    q_an = np.zeros((N,3))
+    #compute the exact solution for each time in t_vec
+    Nt = t_vec.shape[0]
     alpha  = (gam+1)/(gam-1)
-    for i in range(N):
+    Q_exact = np.zeros((N,3,Nt))
+    for k in range(Nt):
 
-        #undisturbed driven (right) state 
-        if (x[i]>x_sh):
-            rho = q_R[0]
-            u   = 0.0
-            p   = (gam-1)*q_R[2]
+        #current solution time
+        t = t_vec[k]
 
-        #undisturbed driver (left) state
-        elif (x[i]<x_fL):
-            rho = q_L[0]
-            u   = 0.0
-            p   = (gam-1)*q_L[2]
+        #compute shock velocity [m/s] and static pressure-jump P_21 = P2/P1
+        v_sh = M_sh*c_R
+        x_sh = x0 + v_sh*t
+        P_21 = 1.0+2*gam/(gam+1)*(M_sh**2-1)
 
-        #between the head of the expansion fan the the shock
-        else:
+        #compute velocity of the contact discontinuity [m/s]
+        v_ct = 2*c_L/(gam-1)*(1-(P_21/P_41)**((gam-1)/(2*gam)))
+        x_ct = x0 + v_ct*t
+        u3 = v_ct; u2 = v_ct
 
-            #define a locator variable
-            xi = (x[i]-x_fR)/(x_ct-x_fR)
-            
-            #x between shock and contact discontinuity
-            if (xi>1.0):
-                rho = ((1+alpha*P_21)/(alpha+P_21))*q_R[0]
-                u   = u2
-                p   = P_21*((gam-1)*q_R[2])
+        #compute sound speeds in Regions 2 and 3
+        c2 = c_R*np.sqrt(P_21*(2+(gam-1)*M_sh**2)/((gam+1)*M_sh**2))
+        c3 = c_L*(P_21/P_41)**((gam-1)/(2*gam))
 
-            #x within the expansion fan
-            elif (xi<0.0):
-                u   = 2/(gam+1)*(c_L+(x[i]-x0)/t)
-                p   = (gam-1)*q_L[2]*(1-(gam-1)*u/(2*c_L))**(2*gam/(gam-1))
-                rho = q_L[0]*(p/((gam-1)*q_L[2]))**(1/gam)
+        #compute velocity of left and right sides of the expansion fan
+        v_fL = -c_L
+        x_fL = x0 + v_fL*t
+        v_fR = u2-c3
+        x_fR = x0 + v_fR*t
 
-            #x between contact disconinuity and expansion fan
+        #write out the solution
+        for i in range(N):
+
+            #undisturbed driven (right) state 
+            if (x[i]>x_sh):
+                rho = q_R[0]
+                u   = 0.0
+                p   = (gam-1)*q_R[2]
+
+            #undisturbed driver (left) state
+            elif (x[i]<x_fL):
+                rho = q_L[0]
+                u   = 0.0
+                p   = (gam-1)*q_L[2]
+
+            #between the head of the expansion fan the the shock
             else:
-                rho = q_L[0]*(P_21/P_41)**(1/gam)
-                u   = u3
-                p   = P_21*((gam-1)*q_R[2])
 
-        #construct solution vector from the primitive variables
-        q_an[i,0] = rho
-        if (abs(t)>eps):
-            q_an[i,1] = rho*u
-        q_an[i,2] = p/(gam-1)+0.5*rho*u**2
+                #define a locator variable
+                xi = (x[i]-x_fR)/(x_ct-x_fR)
+                
+                #x between shock and contact discontinuity
+                if (xi>1.0):
+                    rho = ((1+alpha*P_21)/(alpha+P_21))*q_R[0]
+                    u   = u2
+                    p   = P_21*((gam-1)*q_R[2])
 
+                #x within the expansion fan
+                elif (xi<0.0):
+                    u   = 2/(gam+1)*(c_L+(x[i]-x0)/t)
+                    p   = (gam-1)*q_L[2]*(1-(gam-1)*u/(2*c_L))**(2*gam/(gam-1))
+                    rho = q_L[0]*(p/((gam-1)*q_L[2]))**(1/gam)
 
-    #plot the solution if run without arguments 
-    if (mode == 'demo'):
+                #x between contact disconinuity and expansion fan
+                else:
+                    rho = q_L[0]*(P_21/P_41)**(1/gam)
+                    u   = u3
+                    p   = P_21*((gam-1)*q_R[2])
 
-        #compute the variables
-        P_plot = (gam-1)*(q_an[:,2]-q_an[:,1]**2/(2*q_an[:,0]))
-        U = q_an[:,1]/q_an[:,0]
-        Mach = np.sqrt(q_an[:,0]*U**2/(gam*P_plot))
-        T_plot = P_plot/(R*q_an[:,0])
-        c_plot = np.sqrt(gam*R*T_plot)
-        Entropy = P_plot/(q_an[:,0])**(gam)
-        e = q_an[:,2]/q_an[:,0]-0.5*U**2
-        t_plt = float(1e3*t)
+            #construct solution vector from the primitive variables
+            Q_exact[i,0,k] = rho
+            Q_exact[i,1,k] = rho*u
+            Q_exact[i,2,k] = p/(gam-1)+0.5*rho*u**2
 
-        #make the figures
-        fig = plt.figure(f_num)
-        ax1 = fig.add_subplot(221)
-        ax1.plot(x,q_an[:,0],'-b',linewidth=3.0)
-        ax1.set_title('Density (t=%1.3f[ms])' % t_plt)
-        ax1.set(xlabel=r'$x\;[m]$', ylabel=r'$\rho\;[kg/m^3]$')
-        ax2 = fig.add_subplot(222)
-        ax2.plot(x,(1e-3)*P_plot,'-b',linewidth=3.0)
-        ax2.set_title('Pressure (t=%1.3f[ms])' % t_plt)
-        ax2.set(xlabel=r'$x\;[m]$', ylabel=r'$p\;[kPa]$')
-        ax3 = fig.add_subplot(223)
-        ax3.plot(x,U,'-b',linewidth=3.0)
-        ax3.set_title('Velocity (t=%1.3f[ms])' % t_plt)
-        ax3.set(xlabel=r'$x\;[m]$', ylabel=r'$V\;[m/s]$')
-        ax4 = fig.add_subplot(224)
-        ax4.plot(x,Mach,'-b',linewidth=3.0)
-        ax4.set_title('Mach (t=%1.3f[ms])' % t_plt)
-        ax4.set(xlabel=r'$x\;[m]$', ylabel=r'$M$')
-        fig.tight_layout()
-        plt.savefig('fig_%d.pdf' % f_num)
-        f_num += 1
+        #plot the solution if run without arguments 
+        if (mode=='demo' or (mode=='testing' and k==(Nt-1))):
 
-        fig = plt.figure(f_num)
-        ax1 = fig.add_subplot(221)
-        ax1.plot(x,(1e-3)*e,'-b',linewidth=3.0)
-        ax1.set_title('Specific Energy (t=%1.3f[ms])' % t_plt)
-        ax1.set(xlabel=r'$x\;[m]$', ylabel=r'$e\;[kJ/kg]$')
-        ax2 = fig.add_subplot(222)
-        ax2.plot(x,c_plot,'-b',linewidth=3.0)
-        ax2.set_title('Speed of Sound (t=%1.3f[ms])' % t_plt)
-        ax2.set(xlabel=r'$x\;[m]$', ylabel=r'$c\;[m/s]$')
-        ax3 = fig.add_subplot(223)
-        ax3.plot(x,T_plot,'-b',linewidth=3.0)
-        ax3.set_title('Temperature (t=%1.3f[ms])' % t_plt)
-        ax3.set(xlabel=r'$x\;[m]$', ylabel=r'$T\;[K]$')
-        ax4 = fig.add_subplot(224)
-        ax4.plot(x,(1e-3)*Entropy,'-b',linewidth=3.0)
-        ax4.set_title('Entropy (t=%1.3f[ms])' % t_plt)
-        ax4.set(xlabel=r'$x\;[x]$', ylabel=r'$s\;[kJ/kgK]$')
-        fig.tight_layout()
-        plt.savefig('fig_%d.pdf' % f_num)
-        f_num += 1
+            #compute the variables
+            P_plot = (gam-1)*(Q_exact[:,2,k]-Q_exact[:,1,k]**2/(2*Q_exact[:,0,k]))
+            U = Q_exact[:,1,k]/Q_exact[:,0,k]
+            Mach = np.sqrt(Q_exact[:,0,k]*U**2/(gam*P_plot))
+            T_plot = P_plot/(R*Q_exact[:,0,k])
+            c_plot = np.sqrt(gam*R*T_plot)
+            Entropy = P_plot/(Q_exact[:,0,k])**(gam)
+            e = Q_exact[:,2,k]/Q_exact[:,0,k]-0.5*U**2
+            t_plt = float(1e3*t)
 
-        #show the plot(s)
-        plt.show()
-     
-    return q_an
+            #make the figures
+            fig = plt.figure(f_num)
+            ax1 = fig.add_subplot(221)
+            ax1.plot(x,Q_exact[:,0,k],'-b',linewidth=3.0)
+            ax1.set_title('Density (t=%1.3f[ms])' % t_plt)
+            ax1.set(xlabel=r'$x\;[m]$', ylabel=r'$\rho\;[kg/m^3]$')
+            ax2 = fig.add_subplot(222)
+            ax2.plot(x,(1e-3)*P_plot,'-b',linewidth=3.0)
+            ax2.set_title('Pressure (t=%1.3f[ms])' % t_plt)
+            ax2.set(xlabel=r'$x\;[m]$', ylabel=r'$p\;[kPa]$')
+            ax3 = fig.add_subplot(223)
+            ax3.plot(x,U,'-b',linewidth=3.0)
+            ax3.set_title('Velocity (t=%1.3f[ms])' % t_plt)
+            ax3.set(xlabel=r'$x\;[m]$', ylabel=r'$V\;[m/s]$')
+            ax4 = fig.add_subplot(224)
+            ax4.plot(x,Mach,'-b',linewidth=3.0)
+            ax4.set_title('Mach (t=%1.3f[ms])' % t_plt)
+            ax4.set(xlabel=r'$x\;[m]$', ylabel=r'$M$')
+            fig.tight_layout()
+            plt.savefig('fig_%d.pdf' % f_num)
+            f_num += 1
 
+            fig = plt.figure(f_num)
+            ax1 = fig.add_subplot(221)
+            ax1.plot(x,(1e-3)*e,'-b',linewidth=3.0)
+            ax1.set_title('Specific Energy (t=%1.3f[ms])' % t_plt)
+            ax1.set(xlabel=r'$x\;[m]$', ylabel=r'$e\;[kJ/kg]$')
+            ax2 = fig.add_subplot(222)
+            ax2.plot(x,c_plot,'-b',linewidth=3.0)
+            ax2.set_title('Speed of Sound (t=%1.3f[ms])' % t_plt)
+            ax2.set(xlabel=r'$x\;[m]$', ylabel=r'$c\;[m/s]$')
+            ax3 = fig.add_subplot(223)
+            ax3.plot(x,T_plot,'-b',linewidth=3.0)
+            ax3.set_title('Temperature (t=%1.3f[ms])' % t_plt)
+            ax3.set(xlabel=r'$x\;[m]$', ylabel=r'$T\;[K]$')
+            ax4 = fig.add_subplot(224)
+            ax4.plot(x,(1e-3)*Entropy,'-b',linewidth=3.0)
+            ax4.set_title('Entropy (t=%1.3f[ms])' % t_plt)
+            ax4.set(xlabel=r'$x\;[x]$', ylabel=r'$s\;[kJ/kgK]$')
+            fig.tight_layout()
+            plt.savefig('fig_%d.pdf' % f_num)
+            f_num += 1
+
+            #show the plot(s)
+            plt.show(block=False)
+            sleep(5)
+            #plt.clf()
+    
+    print('Exact solution for 1D shock-tube has been generated.\n')
+
+ 
+    return Q_exact
 
 f_num = 1
 ## Test wave speed function 
@@ -639,3 +654,7 @@ f_num = 1
 #
 ##test area ratio function
 
+
+#test the exact solution
+#import numpy as np
+#Shock_Tube_Exact(-1,1,50,70e5,300,1e5,300,np.linspace(0.0,3e-3,5),mode='testing')
