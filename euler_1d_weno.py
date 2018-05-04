@@ -35,25 +35,9 @@ def init_cond(X_min,X_max,N,P4,T4,P1,T1,x_bnd=0.0):
     q_init[:,1] = rho*u
     q_init[:,2] = P/(gam-1.0) + 0.5*rho*u**2
 
-
     print('Intiial condition generated successfully.')
-
     
     return q_init, X
-
-'''	
-#Test init_cond
-q,x = init_cond(-17.0,2.0,100,70e5,300,1e5,300)
-
-import matplotlib.pyplot as plt
-import sys,os
-
-
-plt.figure()
-plt.plot(x,q[:,0],'-b',linewidth=3.5)
-plt.show()
-sys.exit()
-'''
 
 def phys_flux(q):
 #q is an Nxnv matrix with N grid points and nv variables   
@@ -98,7 +82,7 @@ def euler_1d_wavespeed(q):
 
 
 def langrange_extrap(x_in,q_in,x_ext):
-#function which computes the 5th-order Lagrange extrapolated solution 
+# Function which computes the 5th-order Lagrange extrapolated solution 
 # x_in is an Npx1 vector of Np grid points points
 # q_in is an NpxNv matrix with Np points and Nv solution variables   
 # x_ext is an 1x1 scalar of the desired point to evaluate L(x)
@@ -196,61 +180,51 @@ def char_numerical_flux(q):
             # if(np.abs(f_char_i_p_half[i,k])>10**8):
                 # print("i = ",i," s = ",k," total number of x_{i+1/2} points = ",N_x_p_half)
         
-        #input('waiting for you')
     return f_char_i_p_half
 
 
 def phi_weno5(f_char_p_s,flg):
+    '''
+    Function which computes a 5th-order WENO reconstruction of the numerical
+    flux at location x_{i+1/2}, works regardless of the sign of f'(u)
 
+    '''
     import numpy as np
-    
+   
+    #assign the fluxes at each point in the full stencil 
     f_i_m_2 = f_char_p_s[0]
     f_i_m_1 = f_char_p_s[1]
     f_i     = f_char_p_s[2]
     f_i_p_1 = f_char_p_s[3]
     f_i_p_2 = f_char_p_s[4]
     
+    #estimate of f_{i+1/2} for each substencil
     f0 = (1/3)*f_i_m_2 - (7/6)*f_i_m_1 + (11/6)*f_i
     f1  = (-1/6)*f_i_m_1 + (5/6)*f_i + (1/3)*f_i_p_1
     f2  = (1/3)*f_i + (5/6)*f_i_p_1 - (1/6)*f_i_p_2
     
-    #print('%d\t%3.4f\t%3.4f\t%3.4f' % (flg,f0,f1,f2))
-    #print(" ---------------------- ")
-    
+    #smoothness indicators for the solution on each substencil 
     beta_0 = (13/12)*(f_i_m_2 - 2*f_i_m_1 + f_i)**2 + (1/4)*(f_i_m_2 - 4*f_i_m_1 + 3*f_i)**2
     beta_1 = (13/12)*(f_i_m_1 - 2*f_i + f_i_p_1)**2 + (1/4)*(f_i_m_1 - f_i_p_1)**2
     beta_2 = (13/12)*(f_i - 2*f_i_p_1 + f_i_p_2)**2 + (1/4)*(3*f_i - 4*f_i_p_1 + f_i_p_2)**2
- 
-    #print('%d\t%1.4e\t%1.4e\t%1.4e' % (flg,beta_0,beta_1,beta_2))
- 
+
+    #unscaled nonlinear weights 
     epsilon = 1e-6
-    
     w0_tilde = 0.1/(epsilon + beta_0)**2
     w1_tilde = 0.6/(epsilon + beta_1)**2
     w2_tilde = 0.3/(epsilon + beta_2)**2
     
+    #scaled nonlinear weights
     w0 = w0_tilde/(w0_tilde + w1_tilde + w2_tilde)
     w1 = w1_tilde/(w0_tilde + w1_tilde + w2_tilde)
     w2 = w2_tilde/(w0_tilde + w1_tilde + w2_tilde)
     
     #hardcode optimal linear weights
     #w0 = 0.1; w1 = 0.6; w2 = 0.3;
-    
-    #print('%d\t%3.4f\t%3.4f\t%3.4f' % (flg,w0,w1,w2))
-    
+   
+    #linear convex combination of (3) substencil
     f_char_i_p_half_p_s = w0*f0 + w1*f1 + w2*f2
     
-    # if(np.abs(f_char_i_p_half_p_s)>10**8):
-        # print("f_char_p_s[0] = ",f_char_p_s[0]," flux direction = ",flg)
-        # print("f_char_p_s[1] = ",f_char_p_s[1])
-        # print("f_char_p_s[2] = ",f_char_p_s[2])
-        # print("f_char_p_s[3] = ",f_char_p_s[3])
-        # print("f_char_p_s[0] = ",f_char_p_s[4])
-        # print(" --- ")
-        # print("w0 = ",w0," f0 = ",f0," flux direction = ",flg) 
-        # print("w1 = ",w1," f1 = ",f1)         
-        # print("w2 = ",w2," f2 = ",f2) 
-        
     return f_char_i_p_half_p_s
     
 def proj_to_char(q,f,q_st):
@@ -291,6 +265,7 @@ def proj_to_char(q,f,q_st):
 
     return q_char,f_char
 
+
 def spatial_rhs(f_char,q_cons,dx):
     '''
     f_char is a Ni x nv matrix of the characteristic flux only at interior adjacent flux interfaces
@@ -319,7 +294,6 @@ def spatial_rhs(f_char,q_cons,dx):
         c = np.sqrt(gam*p/rho) 
 
         #matrix of right eigenvectors of A (eigenvalues in order u-c, u, and u+c)
-        
         R[i,0,:] = 1.0
         R[i,1,0] = u-c
         R[i,1,1] = u
@@ -328,6 +302,7 @@ def spatial_rhs(f_char,q_cons,dx):
         R[i,2,1] = 0.5*u**2
         R[i,2,2] = c**2/(gam-1.0)+0.5*u**2+u*c
 
+    #project solution back into physical space
     qdot_cons = np.zeros((N-1,f_char.shape[1]))
     for i in range(N-1):   
         
@@ -335,16 +310,29 @@ def spatial_rhs(f_char,q_cons,dx):
         M = np.eye(3) 
         if(i==N-2): M[0,0] = 0
         
-        # Local Right Eigen Matrices
+        # Local Right Eigenmatrices
         R_p_half = R[i+1,:,:]
         R_m_half = R[i,:,:]
         
-        # The local qdot
+        #local qdot
         qdot_cons[i,:] = (-1/dx)*( R_p_half.dot(M.dot((f_char[i+1,:]).T)) - R_m_half.dot(M.dot((f_char[i,:]).T)) ).T
         
     return qdot_cons
 
-def q1d_afunc(x,r,makePlot=False,demo=False):
+#source term which accounts for quasi-1D area variation
+def quasi1D_rhs(f_vec,q): 
+
+    import numpy as np
+
+    flux = phys_flux(q)
+    rhs = np.zeros(flux.shape)
+    for i in range(q.shape[0]):
+        rhs[i,:] = f_vec[i]*flux[i,:]
+
+    return rhs
+
+f_num = 1
+def areaFunc(x,r,X_vec,makePlot=False,demo=False):
 #computes 1/A*dA/dx based on a provided geometry R(x)
 
     from scipy.interpolate import splrep, splev
@@ -380,13 +368,8 @@ def q1d_afunc(x,r,makePlot=False,demo=False):
                           [2.000000,   0.0579985]])
             x,r = X[:,0],X[:,1]
 
-        ##use LaTeX formatting for titles and axes
-        #plt.rc('text', usetex=True)
-        #plt.rc('font', family='serif')
-        #plt.rcParams['figure.figsize'] = (10.0,6.0)
-
         #plot the discrete points and the phcip spline
-        plt.figure()
+        plt.figure(f_num)
         x_plt = np.linspace(x.min(),x.max(),int(1e4))
         r_func = interp.pchip(x,r)
         plt.plot(x_plt,r_func.__call__(x_plt),'-b',linewidth=3.0,label='PCHIP Interpolant',zorder=1)
@@ -400,16 +383,15 @@ def q1d_afunc(x,r,makePlot=False,demo=False):
         plt.ylabel(r'$r\;[m]$',fontsize=15)
         plt.title(r'GALCIT Ludwieg Tube - Nozzle',fontsize=17)
         plt.legend(fontsize=12)
-        plt.savefig('fig_%d.pdf' % f_num)
-        #plt.show()
+        plt.savefig('nozzle.pdf')
+        plt.savefig('nozzle.png')
         f_num += 1
 
-    #create an interpolant for log[A(x)] 
+    #create and differentiate the PCHIP interpolant for log[A(x)] 
     l_func = interp.pchip(x,np.log(np.pi*r**2))
+    F_vec = l_func.__call__(X_vec,1)
 
-    #output the derivative function
-    return l_func.__call__(x,1)
-
+    return F_vec
 
 def Shock_Tube_Exact(x_min,x_max,N,P4,T4,P1,T1,time,mode='data'):
     '''
@@ -432,9 +414,7 @@ def Shock_Tube_Exact(x_min,x_max,N,P4,T4,P1,T1,time,mode='data'):
         demo    = Boolean flag for running in demo mode
                                                                     
     ================================================================
-    
     '''
-
     global f_num
 
     import matplotlib.pyplot as plt
@@ -611,7 +591,7 @@ def Shock_Tube_Exact(x_min,x_max,N,P4,T4,P1,T1,time,mode='data'):
             ax4.set_title('Mach (t=%1.3f[ms])' % t_plt)
             ax4.set(xlabel=r'$x\;[m]$', ylabel=r'$M$')
             fig.tight_layout()
-            plt.savefig('fig_%d.pdf' % f_num)
+            #plt.savefig('fig_%d.pdf' % f_num)
             f_num += 1
 
             fig = plt.figure(f_num)
@@ -632,24 +612,13 @@ def Shock_Tube_Exact(x_min,x_max,N,P4,T4,P1,T1,time,mode='data'):
             ax4.set_title('Entropy (t=%1.3f[ms])' % t_plt)
             ax4.set(xlabel=r'$x\;[x]$', ylabel=r'$s\;[kJ/kgK]$')
             fig.tight_layout()
-            plt.savefig('fig_%d.pdf' % f_num)
+            #plt.savefig('fig_%d.pdf' % f_num)
             f_num += 1
 
             #show the plot(s)
-            plt.show(block=False)
-            sleep(5)
-            #plt.clf()
+            plt.show()
+            plt.pause(3.0)
     
     print('Exact solution for 1D shock-tube has been generated.\n')
 
- 
     return Q_exact
-
-f_num = 1
-## Test wave speed function 
-#q,x = init_cond(-17.0,2.0,100,70e5,300,1e5,300)
-#ws = euler_1d_wavespeed(q)
-#print("ws_max = ", ws)
-#
-##test area ratio function
-
