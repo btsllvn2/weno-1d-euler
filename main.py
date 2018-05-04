@@ -42,8 +42,8 @@ N = 500
 X_min,X_max = -17.0,3.0
 
 # Specifiy CFL and total number of time steps
-CFL = 1e-4
-Nt = 200
+CFL = 5e-4
+Nt = 600
 
 # Specify the Pressure and temperature values of the initial condition
 P1 = 1e4
@@ -107,12 +107,16 @@ q1,q2 = np.zeros(q.shape),np.zeros(q.shape)
 #real-time animation  
 plt.ion()
 plt.figure()
-line1, = plt.plot(X[3:N-3],Q_exact[3:N-3,0,0],'-k',linewidth=1.0,label='Exact Solution')
+if(not runQuasi1D):
+    line1, = plt.plot(X[3:N-3],Q_exact[3:N-3,0,0],'-k',linewidth=1.0,label='Exact Solution')
+    plt.title('1D Euler Equations Using WENO-JS (t=%2.3f[ms])' % 0.0)
+else:
+    plt.title('Quasi-1D Euler Equations Using WENO-JS (t=%2.3f[ms])' % 0.0)
 line2, = plt.plot(X[3:N-3],q_init[3:N-3,0],'ob',label='WENO-JS')
-plt.title('Quasi-1D Euler Equations Using WENO-JS (t=%2.3f[ms])' % 0.0)
 plt.xlabel('x')
 plt.ylabel('rho')
 plt.xlim(-3,3)
+plt.ylim(0,1.4)
 plt.legend()
 plt.draw()
 plt.savefig('frames/frame%08d.png' % 0)
@@ -145,9 +149,12 @@ for i in range(1,Nt+1):
 
     #real-time animation   
     if(i%plot_freq==0):
-        line1.set_ydata(Q_exact[3:N-3,0,i])
+        if(not runQuasi1D): 
+            line1.set_ydata(Q_exact[3:N-3,0,i])
+            plt.title('1D Euler Equations Using WENO-JS (t=%2.3f[ms])' % float(1000*i*dt))
+        else:
+            plt.title('Quasi-1D Euler Equations Using WENO-JS (t=%2.3f[ms])' % float(1000*i*dt))
         line2.set_ydata(q[3:N-3,0])
-        plt.title('Quasi-1D Euler Equations Using WENO-JS (t=%2.3f[ms])' % float(1000*i*dt))
         plt.draw()
         if (saveFrames): plt.savefig('frames/frame%08d.png' % int(i/plot_freq))
         plt.pause(eps)
@@ -167,11 +174,3 @@ def animate(n):
     return line,
 ani = animation.FuncAnimation(fig, animate, np.arange(1, Nt),interval=20, blit=True)
 plt.show()  
-    
-    
-    
-    
-    
-    
-    
-    
