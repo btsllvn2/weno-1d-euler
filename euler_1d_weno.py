@@ -35,27 +35,6 @@ def init_cond(X_min,X_max,N,P4,T4,P1,T1,x_bnd=0.0):
     q_init[:,1] = rho*u
     q_init[:,2] = P/(gam-1.0) + 0.5*rho*u**2
     
-    #assign the ghost cell values
-    for i in range(3):
-        q_init[i,0] =  q_init[6-i,0]
-        q_init[i,1] = -q_init[6-i,1]
-        q_init[i,2] =  q_init[6-i,2]
-        q_init[N-3+i,:] = langrange_extrap(X[N-9+i:N-3+i],q_init[N-9+i:N-3+i,:],X[N-3+i])
-        # q_init[N-1-i,0] =  q_init[N-6+i,0]
-        # q_init[N-1-i,1] = -q_init[N-6+i,1]
-        # q_init[N-1-i,2] =  q_init[N-6+i,2]
-    
-    # #assign the ghost cell values
-    # q_init[0,:] = ((10*3)**10)
-    # q_init[1,:] = ((10*2)**10)
-    # q_init[2,:] = ((10*1)**10)
-    
-    # q_init[N-1,:] = ((10*3)**10)
-    # q_init[N-2,:] = ((10*2)**10)
-    # q_init[N-3,:] = ((10*1)**10)
-    
-    
-
     return q_init, X
 
 '''	
@@ -138,6 +117,18 @@ def langrange_extrap(x_in,q_in,x_ext):
         q_ext += q_in[i,:]*l_i
 
     return q_ext
+    
+def update_ghost_pts(X,q):
+
+    #assign the ghost cell values
+    for i in range(3):
+        q[i,0] =  q[6-i,0]
+        q[i,1] = -q[6-i,1]
+        q[i,2] =  q[6-i,2]
+        q[-(3-i),:] = q[-4,:]
+        #q[-(3-i):,:] = langrange_extrap(X[-(9-i):-(4-i)],q[-(9-i):-(4-i),:],X[-(3-i)])
+        
+    return(q)
 
 def char_numerical_flux(q):
 
@@ -270,6 +261,7 @@ def proj_to_char(q,f,q_st):
     u = q_st[1]/q_st[0]
     e = q_st[2]
     p = (gam-1)*(e-0.5*rho*u**2)
+    #print('P =',p)
     c = np.sqrt(gam*p/rho) 
 
     #matrix of left eigenvectors of A (eigenvalues in order u-c, u, and u+c)

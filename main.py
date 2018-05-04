@@ -14,6 +14,7 @@
 import numpy as np
 import scipy.linalg as la 
 import matplotlib.pyplot as plt
+import matplotlib.animation as animation
 import sys,os
 
 # Import the helper functions
@@ -22,26 +23,26 @@ from euler_1d_weno import *
 os.system('clear')
 
 # Specify the number of points in the domain (includes ghost points)
-N = 100
+N = 300
 
 # Specify the domain size
-X_min = -17
-X_max = 2
+X_min,X_max = -2,2
 
 # Step size
 dx = (X_max-X_min)/(N-1)
 
 # Choose CFL
-CFL = 0.5
+CFL = 0.0005
 
 # Select the time step
 dt = CFL*dx
 
 # Select total test time
-Total_Test_Time = 1e-3
+Total_Test_Time = 5e-3
 
 # Number of time steps
-NT = (Total_Test_Time)/dt
+#Nt = round((Total_Test_Time)/dt)
+Nt = 600
 
 # Specify the Pressure and temperature values of the initial condition
 P1 = 1e5
@@ -50,57 +51,61 @@ T1 = 300
 T4 = 300
 
 # [STEP 1]: Assign the initial condition (diaphram at x = 0; Ghost cells populated with large discontinuity)
-q,X = init_cond(X_min,X_max,N,P4,T4,P1,T1)
+q_init,X = init_cond(X_min,X_max,N,P4,T4,P1,T1)
+print('intiial condition generated')
+q = np.copy(q_init)
+Q = np.zeros((q.shape[0]-6,q.shape[1],Nt+1))            #<-stored history
+Q[:,:,0] = q[3:-3,:]
+q1,q2 = np.zeros(q.shape),np.zeros(q.shape)
+print('Entering time loop...')
+for i in range(1,Nt):
 
-# --------------------------------------------------
-plt.figure(1)
-plt.plot(X[3:N-3],q[3:N-3,0],'-b',linewidth=3.5)
-#plt.show()
-# --------------------------------------------------
+    print('n = %d, t = %2.6f [ms]' % (i,i*dt))
+    
+    # Third-order TVD Scheme (Shu '01)
+    q = update_ghost_pts(X,q)
+    L0 = spatial_rhs(char_numerical_flux(q), q, dx)
+    q1[3:-3,:] = q[3:-3,:] + dt*L0
+    
+    q1 = update_ghost_pts(X,q1)
+    L1 = spatial_rhs(char_numerical_flux(q1), q1, dx)
+    q2[3:-3,:] = (3/4)*q[3:-3,:] + (1/4)*q1[3:-3,:] + (1/4)*dt*L1
+    
+    q2 = update_ghost_pts(X,q2)
+    L2 = spatial_rhs(char_numerical_flux(q2), q2, dx)
+    q[3:-3,:] = (1/3)*q[3:-3,:] + (2/3)*q2[3:-3,:] + (2/3)*dt*L2    
 
-
-# [STEP 3]: Compute the numerical charecteristic flux at the half points
-f_char_i_p_half = char_numerical_flux(q)
-
-
-# [STEP 4]: Transform the characteristic flux to numerical flux
-qdot_cons = spatial_rhs(f_char_i_p_half, q, dx)
-
-# --------------------------------------------------
-
-plt.figure(2)
-plt.plot(X[3:N-3],qdot_cons[:,0],'-ob',linewidth=3.5)
-plt.show()
-
-# --------------------------------------------------
-
-# Test derivative approximation
-
-# plt.figure(3)
-# plt.plot(x_i_p_half,f_i_p_half[:,0],'-b',linewidth=3.5)
+    #update the stored history
+    Q[:,:,i] = q[3:-3,:]
+   
+   
+# #animate the solution
+# # --------------------------------------------------
+# plt.figure(1)
+# plt.plot(X[3:N-3],q[3:N-3,0],'-b',linewidth=3.5)
+# plt.xlabel('x')
+# plt.ylabel('rho')
 # plt.show()
+# # -------------------------------------------------- 
 
-# for i in range(0,NT)
+fig, ax = plt.subplots()
+line, = ax.plot(X[3:N-3],Q[:,0,0], color='b', marker='o', linewidth=2)
+#ax.grid(ydata=[0], color='b', linestyle='-', linewidth=1)
+plt.xlabel(r'$x$')
+plt.ylabel(r'$\rho(x,t)$')
+plt.xlim(-2.0,2.0)
+plt.title(r'Density Animation')
+def animate(n):
+    line.set_ydata(Q[:,0,n])
+    return line,
 
-    # # [STEP 2]: TVD time stepping
-    # q = TVD_Third_Order_Time_Stepper(q, dt)
+ani = animation.FuncAnimation(fig, animate, np.arange(1, Nt),interval=20, blit=True)
+plt.show()  
     
-    # #assign the ghost cell values
-    # for i in range(3):
-        # q_init[i,0] =  q_init[6-i,0]
-        # q_init[i,1] = -q_init[6-i,1]
-        # q_init[i,2] =  q_init[6-i,2]
-        # # q_init[N-1-i,0] =  q_init[N-6+i,0]
-        # # q_init[N-1-i,1] = -q_init[N-6+i,1]
-        # # q_init[N-1-i,2] =  q_init[N-6+i,2]
     
-    # # #assign the ghost cell values
-    # # q_init[0,:] = ((10*3)**10)
-    # # q_init[1,:] = ((10*2)**10)
-    # # q_init[2,:] = ((10*1)**10)
     
-    # q_init[N-1,:] = ((10*3)**10)
-    # q_init[N-2,:] = ((10*2)**10)
-    # q_init[N-3,:] = ((10*1)**10)
-
-
+    
+    
+    
+    
+    
