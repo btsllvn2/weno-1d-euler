@@ -333,7 +333,7 @@ def spatial_rhs(f_char,q_cons,dx):
         
         #update the boundary condition mask M
         M = np.eye(3) 
-        #if(i==N-2): M[0,0] = 0
+        if(i==N-2): M[0,0] = 0
         
         # Local Right Eigen Matrices
         R_p_half = R[i+1,:,:]

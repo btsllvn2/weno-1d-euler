@@ -65,18 +65,29 @@ q_init,X = init_cond(X_min,X_max,N,P4,T4,P1,T1)
 #compute the exact solution for the 1D shock-tube problem
 t_exact = np.linspace(0,T_final,Nt+1)
 Q_exact = Shock_Tube_Exact(X_min,X_max,X.shape[0],P4,T4,P1,T1,t_exact)
-#plt.show()
-
-sys.exit()
 
 q = np.copy(q_init)
 Q = np.zeros((q.shape[0]-6,q.shape[1],Nt+1))            #<-stored history
 Q[:,:,0] = q[3:-3,:]
 q1,q2 = np.zeros(q.shape),np.zeros(q.shape)
-print('Entering time loop...')
+print('Starting time integration...')
+#real-time animation   
+
+plt.ion()
+plt.figure()
+plt.show()
+line1, = plt.plot(X[3:N-3],Q_exact[3:N-3,0,0],'--k',linewidth=1.0,label='Exact Solution')
+line2, = plt.plot(X[3:N-3],q_init[3:N-3,0],'ob',label='WENO-JS')
+plt.title('Quasi-1D Euler Equations Using WENO-JS')
+plt.xlabel('x')
+plt.ylabel('rho')
+plt.legend()
+#sleep(1)
+plt.draw()
+#sleep(1)
 for i in range(1,Nt+1):
 
-    print('n = %d, t = %2.6f [ms]' % (i,i*dt))
+    print('n = %d,\tt = %2.6f [ms]' % (i,i*dt))
     
     # Third-order TVD Scheme (Shu '01)
     q = update_ghost_pts(X,q)
@@ -93,19 +104,23 @@ for i in range(1,Nt+1):
 
     #update the stored history
     Q[:,:,i] = q[3:-3,:]
-   
-   
+
+    #real-time animation   
+    line1.set_ydata(Q_exact[3:N-3,0,i])
+    line2.set_ydata(q[3:N-3,0])
+    plt.draw()
+    plt.pause(1e-5)
+
+
 # #animate the solution
 # # --------------------------------------------------
-# plt.figure(1)
-# plt.plot(X[3:N-3],q[3:N-3,0],'-b',linewidth=3.5)
-# plt.xlabel('x')
-# plt.ylabel('rho')
+
 # plt.show()
 # # -------------------------------------------------- 
 
 fig, ax = plt.subplots()
 line, = ax.plot(X[3:N-3],Q[:,0,0], color='b', marker='o', linewidth=2)
+
 #ax.grid(ydata=[0], color='b', linestyle='-', linewidth=1)
 plt.xlabel(r'$x$')
 plt.ylabel(r'$\rho(x,t)$')
