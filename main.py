@@ -23,7 +23,7 @@ from euler_1d_weno import *
 
 #options for running the code
 saveFrames = True
-runQuasi1D = False
+runQuasi1D = True
 
 #use LaTeX formatting for titles and axes
 plt.rc('text', usetex=True)
@@ -40,6 +40,10 @@ N = 500
 
 # Specify the domain size
 X_min,X_max = -17.0,3.0
+
+# Specifiy CFL and total number of time steps
+CFL = 1e-4
+Nt = 200
 
 # Specify the Pressure and temperature values of the initial condition
 P1 = 1e4
@@ -86,10 +90,8 @@ else:
     print('1D shape(F_vec) = ',F_vec.shape)
 
 #determine the time parameters
-CFL = 5e-4
 dx = X[1]-X[0]
 dt = CFL*dx
-Nt = 600
 T_final = Nt*dt 
 
 #compute the exact solution for the 1D shock-tube problem
@@ -127,16 +129,16 @@ for i in range(1,Nt+1):
     
     # Third-order TVD Scheme (Shu '01)
     q = update_ghost_pts(X,q)
-    L0 = spatial_rhs(char_numerical_flux(q),q,dx) + quasi1D_rhs(F_vec,q[3:-3,:])
+    L0 = spatial_rhs(char_numerical_flux(q),q,dx) + q1d_rhs(F_vec,q[3:-3,:])
     q1[3:-3,:] = q[3:-3,:] + L0*dt
     
     q1 = update_ghost_pts(X,q1)
-    L1 = spatial_rhs(char_numerical_flux(q1),q1,dx) + quasi1D_rhs(F_vec,q1[3:-3,:])
+    L1 = spatial_rhs(char_numerical_flux(q1),q1,dx) + q1d_rhs(F_vec,q1[3:-3,:])
     q2[3:-3,:] = (3/4)*q[3:-3,:] + (1/4)*q1[3:-3,:] + (1/4)*L1*dt
     
     q2 = update_ghost_pts(X,q2)
-    L2 = spatial_rhs(char_numerical_flux(q2),q2,dx) + quasi1D_rhs(F_vec,q2[3:-3,:])
-    q[3:-3,:] = (1/3)*q[3:-3,:] + (2/3)*q2[3:-3,:] + (2/3)*L2*dt    
+    L2 = spatial_rhs(char_numerical_flux(q2),q2,dx) + q1d_rhs(F_vec,q2[3:-3,:])
+    q[3:-3,:] = (1/3)*q[3:-3,:] + (2/3)*q2[3:-3,:]  + (2/3)*L2*dt    
 
     #update the stored history
     Q[:,:,i] = q[3:-3,:]
@@ -150,7 +152,7 @@ for i in range(1,Nt+1):
         if (saveFrames): plt.savefig('frames/frame%08d.png' % int(i/plot_freq))
         plt.pause(eps)
 
-plt.show(block=False)
+plt.show()
 
 fig, ax = plt.subplots()
 line, = ax.plot(X[3:N-3],Q[:,0,0], color='b', marker='o', linewidth=2)

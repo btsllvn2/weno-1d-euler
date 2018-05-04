@@ -320,14 +320,27 @@ def spatial_rhs(f_char,q_cons,dx):
     return qdot_cons
 
 #source term which accounts for quasi-1D area variation
-def quasi1D_rhs(f_vec,q): 
+def q1d_rhs(f_vec,q): 
 
     import numpy as np
 
-    flux = phys_flux(q)
+    #primitive variables
+    gam = 1.4
+    rho = q[:,0]
+    u = q[:,1]/q[:,0]
+    e = q[:,2]
+    p = (gam-1.0)*(e-0.5*rho*u**2)
+
+    #compute the unscalex Q1D source term
+    flux = np.zeros(q.shape)
+    flux[:,0] = rho*u
+    flux[:,1] = rho*u**2
+    flux[:,2] = u*(p+e)
+
+    #compute the rhs matrix
     rhs = np.zeros(flux.shape)
     for i in range(q.shape[0]):
-        rhs[i,:] = f_vec[i]*flux[i,:]
+        rhs[i,:] = -f_vec[i]*flux[i,:]
 
     return rhs
 
@@ -390,6 +403,13 @@ def areaFunc(x,r,X_vec,makePlot=False,demo=False):
     #create and differentiate the PCHIP interpolant for log[A(x)] 
     l_func = interp.pchip(x,np.log(np.pi*r**2))
     F_vec = l_func.__call__(X_vec,1)
+
+    ##output the derivative to the screen
+    #print('  First derivative of log[A(x)] function:\n')
+    #print(' x[m]\tArea_Derivative')
+    #print('==========================================\n')
+    #for i in range(X_vec.shape[0]):
+    #    print('%3.4f\t%3.5f' % (X_vec[i],F_vec[i]))
 
     return F_vec
 
