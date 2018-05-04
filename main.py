@@ -62,18 +62,17 @@ plt.plot(X[3:N-3],q[3:N-3,0],'-b',linewidth=3.5)
 # [STEP 3]: Compute the numerical charecteristic flux at the half points
 f_char_i_p_half = char_numerical_flux(q)
 
+
+# [STEP 4]: Transform the characteristic flux to numerical flux
+qdot_cons = spatial_rhs(f_char_i_p_half, q, dx)
+
 # --------------------------------------------------
 
-x_i_p_half = (X[2:X.shape[0]-3] + X[3:X.shape[0]-2])*0.5
-
 plt.figure(2)
-plt.plot(x_i_p_half[0:-1],f_char_i_p_half[0:-1,2],'-b',linewidth=3.5)
+plt.plot(X[3:N-3],qdot_cons[:,0],'-ob',linewidth=3.5)
 plt.show()
 
 # --------------------------------------------------
-
-# [STEP 4]: Transform the characteristic flux to numerical flux
-f_i_p_half = proj_to_cons(f_char_i_p_half, q)
 
 # Test derivative approximation
 
@@ -86,6 +85,22 @@ f_i_p_half = proj_to_cons(f_char_i_p_half, q)
     # # [STEP 2]: TVD time stepping
     # q = TVD_Third_Order_Time_Stepper(q, dt)
     
-
+    # #assign the ghost cell values
+    # for i in range(3):
+        # q_init[i,0] =  q_init[6-i,0]
+        # q_init[i,1] = -q_init[6-i,1]
+        # q_init[i,2] =  q_init[6-i,2]
+        # # q_init[N-1-i,0] =  q_init[N-6+i,0]
+        # # q_init[N-1-i,1] = -q_init[N-6+i,1]
+        # # q_init[N-1-i,2] =  q_init[N-6+i,2]
+    
+    # # #assign the ghost cell values
+    # # q_init[0,:] = ((10*3)**10)
+    # # q_init[1,:] = ((10*2)**10)
+    # # q_init[2,:] = ((10*1)**10)
+    
+    # q_init[N-1,:] = ((10*3)**10)
+    # q_init[N-2,:] = ((10*2)**10)
+    # q_init[N-3,:] = ((10*1)**10)
 
 

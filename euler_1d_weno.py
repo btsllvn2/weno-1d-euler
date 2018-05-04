@@ -35,23 +35,26 @@ def init_cond(X_min,X_max,N,P4,T4,P1,T1,x_bnd=0.0):
     q_init[:,1] = rho*u
     q_init[:,2] = P/(gam-1.0) + 0.5*rho*u**2
     
-    # #assign the ghost cell values
-    # for i in range(3):
-        # q_init[i,0] =  q_init[6-i,0]
-        # q_init[i,1] = -q_init[6-i,1]
-        # q_init[i,2] =  q_init[6-i,2]
+    #assign the ghost cell values
+    for i in range(3):
+        q_init[i,0] =  q_init[6-i,0]
+        q_init[i,1] = -q_init[6-i,1]
+        q_init[i,2] =  q_init[6-i,2]
+        q_init[N-3+i,:] = langrange_extrap(X[N-9+i:N-3+i],q_init[N-9+i:N-3+i,:],X[N-3+i])
         # q_init[N-1-i,0] =  q_init[N-6+i,0]
         # q_init[N-1-i,1] = -q_init[N-6+i,1]
         # q_init[N-1-i,2] =  q_init[N-6+i,2]
     
-    #assign the ghost cell values
-    q_init[0,:] = ((10*3)**10)
-    q_init[1,:] = ((10*2)**10)
-    q_init[2,:] = ((10*1)**10)
+    # #assign the ghost cell values
+    # q_init[0,:] = ((10*3)**10)
+    # q_init[1,:] = ((10*2)**10)
+    # q_init[2,:] = ((10*1)**10)
     
-    q_init[N-1,:] = ((10*3)**10)
-    q_init[N-2,:] = ((10*2)**10)
-    q_init[N-3,:] = ((10*1)**10)
+    # q_init[N-1,:] = ((10*3)**10)
+    # q_init[N-2,:] = ((10*2)**10)
+    # q_init[N-3,:] = ((10*1)**10)
+    
+    
 
     return q_init, X
 
@@ -111,7 +114,7 @@ def euler_1d_wavespeed(q):
     return ws
 
 
-def langrange_extrap(x_in,q_in,x_ext,q_ext):
+def langrange_extrap(x_in,q_in,x_ext):
 #function which computes the 5th-order Lagrange extrapolated solution 
 # x_in is an Npx1 vector of Np grid points points
 # q_in is an NpxNv matrix with Np points and Nv solution variables   
@@ -180,21 +183,25 @@ def char_numerical_flux(q):
         for j in range(stencil_size):
             f_char_p[:,j] = (0.5*( (fi[j,:]).T + (np.diag(ws)).dot((qi[j,:]).T) )).T
             f_char_m[:,j] = (0.5*( (fi[j+1,:]).T - (np.diag(ws)).dot((qi[j+1,:]).T) )).T
+            #print("(fi[j+1,:]) = ",(fi[j+1,:])," and (qi[j+1,:]) = ",(qi[j+1,:]))
 
         # Compute the i + 1/2 points flux
         for k in range(0, Nvar):
-            print('\tPositive Flux')
-            print('%d\t%3.4f\t%3.4f\t%3.4f\t%3.4f\t%3.4f' % (i,f_char_p[k,0],f_char_p[k,1],f_char_p[k,2],f_char_p[k,3],f_char_p[k,4]))
-            print(" ---------------------- ")
-            print('\tNegative Flux')
-            print('%d\t%3.4f\t%3.4f\t%3.4f\t%3.4f\t%3.4f' % (i,f_char_m[k,0],f_char_m[k,1],f_char_m[k,2],f_char_m[k,3],f_char_m[k,4]))
+            # print('\tPositive Flux')
+            # print('%d\t%3.4f\t%3.4f\t%3.4f\t%3.4f\t%3.4f' % (i,f_char_p[k,0],f_char_p[k,1],f_char_p[k,2],f_char_p[k,3],f_char_p[k,4]))
+            # print(" ---------------------- ")
+            # print('\tNegative Flux')
+            # print('%d\t%3.4f\t%3.4f\t%3.4f\t%3.4f\t%3.4f' % (i,f_char_m[k,0],f_char_m[k,1],f_char_m[k,2],f_char_m[k,3],f_char_m[k,4]))
+            #print("i =",i," k = ",k,"numerical char flux positive = ",phi_weno5(f_char_p[k,:],i)," negative = ",phi_weno5(f_char_m[k,::-1],i))
+            
             f_char_i_p_half[i,k] = phi_weno5(f_char_p[k,:],i) + phi_weno5(f_char_m[k,::-1],i)
-            print(" ---------------------- ")
-            print(" ---------------------- ")
+            #print(" ==================================== ")
+            #print(" ==================================== ")
+            #print(" ")
             # if(np.abs(f_char_i_p_half[i,k])>10**8):
                 # print("i = ",i," s = ",k," total number of x_{i+1/2} points = ",N_x_p_half)
         
-        input('waiting for you')
+        #input('waiting for you')
     return f_char_i_p_half
 
 
@@ -211,6 +218,9 @@ def phi_weno5(f_char_p_s,flg):
     f0 = (1/3)*f_i_m_2 - (7/6)*f_i_m_1 + (11/6)*f_i
     f1  = (-1/6)*f_i_m_1 + (5/6)*f_i + (1/3)*f_i_p_1
     f2  = (1/3)*f_i + (5/6)*f_i_p_1 - (1/6)*f_i_p_2
+    
+    #print('%d\t%3.4f\t%3.4f\t%3.4f' % (flg,f0,f1,f2))
+    #print(" ---------------------- ")
     
     beta_0 = (13/12)*(f_i_m_2 - 2*f_i_m_1 + f_i)**2 + (1/4)*(f_i_m_2 - 4*f_i_m_1 + 3*f_i)**2
     beta_1 = (13/12)*(f_i_m_1 - 2*f_i + f_i_p_1)**2 + (1/4)*(f_i_m_1 - f_i_p_1)**2
@@ -272,21 +282,6 @@ def proj_to_char(q,f,q_st):
     L[2,1] = -(0.5/c)*((gam-1.0)*(u/c)-1.0)
     L[0,2] = L[2,2] = (gam-1.0)/(2*c**2)
     L[1,2] = -(gam-1.0)/c**2
-
-    #matrix of right eigenvectors of A (eigenvalues in order u-c, u, and u+c)
-    R = np.zeros((3,3))
-    R[0,:] = 1.0
-    R[1,0] = u-c
-    R[1,1] = u
-    R[1,2] = u+c
-    R[2,0] = c**2/(gam-1.0)+0.5*u**2-u*c
-    R[2,1] = 0.5*u**2
-    R[2,2] = c**2/(gam-1.0)+0.5*u**2+u*c
-    
-    #eigenvector test
-    mat = np.eye(3)-R.dot(L)
-    print(mat)
-    #input('Is this year')
     
     #project solution/flux into characteristic space for each point in stencil
     q_char = np.zeros(q.shape)
@@ -297,10 +292,10 @@ def proj_to_char(q,f,q_st):
 
     return q_char,f_char
 
-def proj_to_cons(f_char,q_cons):
+def spatial_rhs(f_char,q_cons,dx):
     '''
-    f_char is a Nxnv matrix of the characteristic flux for all grid points
-    q_cons is a Nxnv matrix of the conservative variables for all grid points
+    f_char is a Ni x nv matrix of the characteristic flux only at interior adjacent flux interfaces
+    q_cons is a Np x nv matrix of the conservative variables full domain
 
     '''
     import numpy as np
@@ -309,9 +304,9 @@ def proj_to_cons(f_char,q_cons):
     q_i_p_half = (q_cons[2:q_cons.shape[0]-3,:] + q_cons[3:q_cons.shape[0]-2,:])*0.5
 
     #compute the (conservative) flux at each point in the grid
-    f_cons = np.zeros(f_char.shape)
     N = f_char.shape[0]
-    for i in range(N-1):
+    R = np.zeros((N,3,3))
+    for i in range(N):
 
         #approximate state at x_{i+1/2}
         q_st = q_i_p_half[i]
@@ -325,36 +320,30 @@ def proj_to_cons(f_char,q_cons):
         c = np.sqrt(gam*p/rho) 
 
         #matrix of right eigenvectors of A (eigenvalues in order u-c, u, and u+c)
-        R = np.zeros((3,3))
-        R[0,:] = 1.0
-        R[1,0] = u-c
-        R[1,1] = u
-        R[1,2] = u+c
-        R[2,0] = c**2/(gam-1.0)+0.5*u**2-u*c
-        R[2,1] = 0.5*u**2
-        R[2,2] = c**2/(gam-1.0)+0.5*u**2+u*c
-       
-        #update the boundary condition mask M
-        M = np.eye(3)
         
-        # Solid Wall
-        if(i==3):
-                M = np.array([[1,0,0],
-                              [0,1,0],
-                              [1,0,0]])
-        # Non-Reflecting Outflow	
-        elif(i==N-4):
-                M = np.array([[0,0,0],
-                              [0,1,0],
-                              [0,0,1]])
-        
-        #for debugging
-        M = np.eye(3)
-	   
-        #project flux back into conservative space (no need to project solution)
-        f_cons[i,:] = (R.dot(M.dot(f_char[i,:].T))).T
+        R[i,0,:] = 1.0
+        R[i,1,0] = u-c
+        R[i,1,1] = u
+        R[i,1,2] = u+c
+        R[i,2,0] = c**2/(gam-1.0)+0.5*u**2-u*c
+        R[i,2,1] = 0.5*u**2
+        R[i,2,2] = c**2/(gam-1.0)+0.5*u**2+u*c
 
-    return f_cons
+    qdot_cons = np.zeros((N-1,f_char.shape[1]))
+    for i in range(N-1):   
+        
+        #update the boundary condition mask M
+        M = np.eye(3) 
+        if(i==N-2): M[0,0] = 0
+        
+        # Local Right Eigen Matrices
+        R_p_half = R[i+1,:,:]
+        R_m_half = R[i,:,:]
+        
+        # The local qdot
+        qdot_cons[i,:] = (-1/dx)*( R_p_half.dot(M.dot((f_char[i+1,:]).T)) - R_m_half.dot(M.dot((f_char[i,:]).T)) ).T
+        
+    return qdot_cons
 
 def q1d_afunc(x,r,makePlot=False,demo=False):
 #computes 1/A*dA/dx based on a provided geometry R(x)
@@ -460,8 +449,8 @@ def Shock_Tube_Exact(x_min,x_max,N,P4,T4,P1,T1,time,mode='data'):
     R = 286.9
 
     #use LaTeX formatting for titles and axes
-    plt.rc('text', usetex=True)
-    plt.rc('font', family='serif')
+    #plt.rc('text', usetex=True)
+    #plt.rc('font', family='serif')
     plt.rcParams['figure.figsize'] = (10.0,6.0)
 
     #set the run parameters
@@ -654,11 +643,8 @@ def Shock_Tube_Exact(x_min,x_max,N,P4,T4,P1,T1,time,mode='data'):
 #print("ws_max = ", ws)
 #
 ##test area ratio function
-# f_num=1
+#f_num=1
 # q1d_afunc(1,1,True,True)
-
-# #test exact solution function
-# Shock_Tube_Exact(True)
 
 #test exact solution function
 #Shock_Tube_Exact(-1,1,50,70e5,300,1e5,300,1e-3,'demo')
