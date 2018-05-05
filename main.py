@@ -101,7 +101,7 @@ if (runQuasi1D):
                          [2.000000,   0.0579985]])
 
     #compute scaling factor (vector) for Quasi-1D source term on the grid "X"
-    F_vec,x_throat = areaFunc(Geom_Dat[:,0],Geom_Dat[:,1],X[3:-3],True)
+    F_vec,x_throat,Mach_vec = areaFunc(Geom_Dat[:,0],Geom_Dat[:,1],X[3:-3],True)
 else:
 
     #force the Q1D source term to be identically zero
@@ -138,11 +138,13 @@ plt.ion()
 plt.figure()
 if(runQuasi1D):
     plt.title('Solution to GALCIT Nozzle Flow Using WENO-JS ($P_{41}$=%d, t=%2.3f[ms])' %(P_41,0.0))
-    plt.plot(x_throat*np.ones(2),[-10,10],'--k',linewidth=1.5)
-    plt.plot(50*np.array([-1,1]),[1.0,1.0],'--k',linewidth=1.5)
+    #plt.plot(x_throat*np.ones(2),[-10,10],'--k',linewidth=1.5)
+    #plt.plot(50*np.array([-1,1]),[1.0,1.0],'--k',linewidth=1.5)
+    line1, = plt.plot(X[3:N-3],Mach_vec,'--k',label='Isentropic Solution',linewidth=1.0)
     line2, = plt.plot(X[3:N-3],M_plt,'-b',label='WENO-JS',linewidth=3.0)
+    plt.legend(loc=2)
     plt.ylabel('Mach')
-    plt.annotate('Throat location',xy=(0.09,4),xytext=(0.25,4.05),fontsize=15,arrowprops=dict(facecolor='black', width=1.0,shrink=0.05))
+    #plt.annotate('Throat location',xy=(0.09,4),xytext=(0.25,4.05),fontsize=15,arrowprops=dict(facecolor='black', width=1.0,shrink=0.05))
     plt.xlim(-0.1,0.7)
     plt.ylim(0,5.0)
 else:

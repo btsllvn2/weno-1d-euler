@@ -364,35 +364,45 @@ def areaFunc(x,r,X_vec,makePlot=False,demo=False):
 
     global f_num
 
+    #relevant constants
+    eps = np.finfo(float).eps
+    gam = 1.4
+    R = 286.9
+    h = 1e-30
+    M_lst = eps
+
     #defensive programming
     for vec in (x,r):
         vec = np.array(vec)
 
+
+    # GALGIT Ludwieg tube geometry + Mach 5 nozzle
+    if (demo): 
+        X = np.array([[-17.00000,  0.0568613],
+                      [-0.445792,  0.0568613],
+                      [-0.100000,  0.0568613],
+                      [0.0295679,  0.0568613],
+                      [0.0384761,  0.0369598],
+                      [0.0538287,  0.0233131],
+                      [0.0828279,  0.0159212],  #<----throat location
+                      [0.131160,   0.0233131],
+                      [0.203942,   0.0363912],
+                      [0.292646,   0.0471948],
+                      [0.405800,   0.0557240],
+                      [0.543973,   0.0579985],
+                      [0.700000,   0.0579985],
+                      [2.000000,   0.0579985]])
+        x,r = X[:,0],X[:,1]
+
+    #define a function which interpolates the given radius data points
+    r_func = interp.pchip(x,r)
+
     #demo inputs
     if (makePlot):
   
-        # GALGIT Ludwieg tube geometry + Mach 5 nozzle
-        if (demo): 
-            X = np.array([[-17.00000,  0.0568613],
-                          [-0.445792,  0.0568613],
-                          [-0.100000,  0.0568613],
-                          [0.0295679,  0.0568613],
-                          [0.0384761,  0.0369598],
-                          [0.0538287,  0.0233131],
-                          [0.0828279,  0.0159212],  #<----throat location
-                          [0.131160,   0.0233131],
-                          [0.203942,   0.0363912],
-                          [0.292646,   0.0471948],
-                          [0.405800,   0.0557240],
-                          [0.543973,   0.0579985],
-                          [0.700000,   0.0579985],
-                          [2.000000,   0.0579985]])
-            x,r = X[:,0],X[:,1]
-
         #plot the discrete points and the phcip spline
         plt.figure(f_num)
         x_plt = np.linspace(x.min(),x.max(),int(1e4))
-        r_func = interp.pchip(x,r)
         plt.plot(x_plt,r_func.__call__(x_plt),'-b',linewidth=3.0,label='PCHIP Interpolant',zorder=1)
         plt.plot(x_plt,-r_func.__call__(x_plt),'-b',linewidth=3.0,zorder=2)
         plt.scatter(x,r,c='r',label='Imported Data Points',zorder=3)
@@ -417,7 +427,7 @@ def areaFunc(x,r,X_vec,makePlot=False,demo=False):
     print('Computing exact location of the throat...')
     x_th = 0.05; cntr=0; err=1.0;
     x_l = 0.05; x_r = 0.20
-    while (abs(err)>1e-10):
+    while (abs(err)>eps):
 
         #update the counter
         cntr += 1 
@@ -437,10 +447,50 @@ def areaFunc(x,r,X_vec,makePlot=False,demo=False):
             print('\n  **Iteration limit exceeded (e = %1.6e)\n' % err)
             break
     x_th = x_new
-
     print('Location of the throat is x_th = %2.8f[m]' % x_th)
+   
+
+    #Compute the isentropic solution for the nozzle flow
+    print('Computing the isentropic nozzle solution...')
+    Mach_vec = np.zeros(F_vec.shape)
+    def Res(M,AR): return ((2/(gam+1)*(1+0.5*(gam-1)*M**2))**((gam+1)/(2*(gam-1)))-M*AR)
+    for i in range(X_vec.shape[0]):
+
+        #area ratio for current location
+        AR = (r_func.__call__(X_vec[i])/r_func.__call__(x_th))**2
+
+        #subsonic or supersonic target
+        if (X_vec[i]<=x_th):
+
+            #subsonic branch
+            M_l = 0.0; M_r = 1.0; cntr=0; err=1.0
+            while ((err>1e-12) and (cntr<=1500)):
+                cntr+=1; 
+                M_new = (M_l*Res(M_r,AR)-M_r*Res(M_l,AR))/(Res(M_r,AR)-Res(M_l,AR))
+                if (Res(M_new,AR)*Res(M_r,AR)>0):
+                    M_r = M_new
+                else:
+                    M_l = M_new
+                err = abs(Res(M_new,AR))
+
+        else:
+
+            #supersonic branch
+            M_l = 1.0; M_r = 5.0; cntr=0; err=1.0
+            while ((err>1e-12) and (cntr<=1500)):
+                cntr+=1; 
+                M_new = (M_l*Res(M_r,AR)-M_r*Res(M_l,AR))/(Res(M_r,AR)-Res(M_l,AR))
+                if (Res(M_new,AR)*Res(M_r,AR)>0):
+                    M_r = M_new
+                else:
+                    M_l = M_new
+                err = abs(Res(M_new,AR))
     
-    return F_vec,x_th
+        #store the Mach number    
+        Mach_vec[i] = M_new
+
+
+    return F_vec,x_th,Mach_vec
 
 def Shock_Tube_Exact(X,P4,T4,P1,T1,time,mode='data'):
     '''
