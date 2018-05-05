@@ -369,12 +369,10 @@ def areaFunc(x,r,X_vec,makePlot=False,demo=False):
     gam = 1.4
     R = 286.9
     h = 1e-30
-    M_lst = eps
 
     #defensive programming
     for vec in (x,r):
         vec = np.array(vec)
-
 
     # GALGIT Ludwieg tube geometry + Mach 5 nozzle
     if (demo): 
@@ -434,13 +432,11 @@ def areaFunc(x,r,X_vec,makePlot=False,demo=False):
     
         #use false-position method to estimate the root
         x_new = (x_l*Res(x_r)-x_r*Res(x_l))/(Res(x_r)-Res(x_l))
-        #print('x_update = ',x_new)
         if (Res(x_new)*Res(x_r)>0):
             x_r = x_new
         else:
             x_l = x_new
         err = abs(x_l-x_r)
-        #print('    N = %d, x_th = %1.6f, e = %1.6e' % (cntr,x_new,err))
 
         #limit total number of iterations
         if (cntr == 100):
@@ -451,9 +447,9 @@ def areaFunc(x,r,X_vec,makePlot=False,demo=False):
    
 
     #Compute the isentropic solution for the nozzle flow
-    print('Computing the isentropic nozzle solution...')
+    print('Computing isentropic nozzle solution')
     Mach_vec = np.zeros(F_vec.shape)
-    def Res(M,AR): return ((2/(gam+1)*(1+0.5*(gam-1)*M**2))**((gam+1)/(2*(gam-1)))-M*AR)
+    def Res(M,AR): return (2/(gam+1)*(1+0.5*(gam-1)*M**2))**((gam+1)/(2*(gam-1)))-M*AR
     for i in range(X_vec.shape[0]):
 
         #area ratio for current location
@@ -486,9 +482,10 @@ def areaFunc(x,r,X_vec,makePlot=False,demo=False):
                     M_l = M_new
                 err = abs(Res(M_new,AR))
     
-        #store the Mach number    
+        #store the converged Mach number    
         Mach_vec[i] = M_new
 
+    print('Finished. Max isentropic Mach number on the grid is M = %2.5f' % Mach_vec.max())
 
     return F_vec,x_th,Mach_vec
 

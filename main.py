@@ -32,6 +32,10 @@ if (noDisplay):
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 
+#create a 'frames' directory if one does not already exist
+if not os.path.exists('frames'):
+    os.makedirs('frames')
+
 #use LaTeX formatting for titles and axes
 plt.rc('text', usetex=True)
 plt.rc('font', family='serif')
@@ -50,7 +54,7 @@ X_min,X_max = -10.0,1.0
 
 # Specifiy CFL and total number of time steps
 CFL = 0.5
-Nt = 600
+Nt = 1200
 
 # Specify the Pressure and temperature values of the initial condition
 P1 = 1e4
@@ -161,7 +165,7 @@ plt.pause(eps)
 
 #time integration
 plot_freq = 1
-print('Starting time integration...')
+print('\nStarting time integration...')
 for i in range(1,Nt+1):
 
     #display to terminal
