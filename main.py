@@ -21,9 +21,9 @@ import sys,os
 #  Main options for running the code:
 #
 #========================================
-noDisplay = True
-saveFrames = True
-runQuasi1D = False
+noDisplay = False
+saveFrames = False
+runQuasi1D = True
 
 #supress display output
 if (noDisplay):
@@ -112,13 +112,14 @@ dt = CFL*dx/u_max
 T_final = Nt*dt 
 
 #compute the exact solution for the 1D shock-tube problem
-t_exact = np.linspace(0,T_final,Nt+1)
-Q_exact = Shock_Tube_Exact(X,P4,T4,P1,T1,t_exact)
-rho_ex = Q_exact[3:-3,0,:]
-u_ex = Q_exact[3:-3,1,:]/rho_ex
-e_ex = Q_exact[3:-3,2,:]
-p_ex = (gam-1.0)*(e_ex-0.5*rho_ex*u_ex**2)
-M_ex = np.sqrt(rho_ex*u_ex**2/(gam*p_ex))
+if (not runQuasi1D):
+    t_exact = np.linspace(0,T_final,Nt+1)
+    Q_exact = Shock_Tube_Exact(X,P4,T4,P1,T1,t_exact)
+    rho_ex = Q_exact[3:-3,0,:]
+    u_ex = Q_exact[3:-3,1,:]/rho_ex
+    e_ex = Q_exact[3:-3,2,:]
+    p_ex = (gam-1.0)*(e_ex-0.5*rho_ex*u_ex**2)
+    M_ex = np.sqrt(rho_ex*u_ex**2/(gam*p_ex))
 
 #allocate arrays for updating the solution
 q = np.copy(q_init)
@@ -141,6 +142,7 @@ if(runQuasi1D):
     plt.plot(50*np.array([-1,1]),[1.0,1.0],'--k',linewidth=1.5)
     line2, = plt.plot(X[3:N-3],M_plt,'-b',label='WENO-JS',linewidth=3.0)
     plt.ylabel('Mach')
+    plt.annotate('Throat location',xy=(0.09,4),xytext=(0.25,4.05),fontsize=15,arrowprops=dict(facecolor='black', width=1.0,shrink=0.05))
     plt.xlim(-0.1,0.7)
     plt.ylim(0,5.0)
 else:
@@ -161,7 +163,7 @@ print('Starting time integration...')
 for i in range(1,Nt+1):
 
     #display to terminal
-    print('n = %d,    t = %2.3f[ms]' % (i,float(1000*i*dt)))
+    print('n = %d,    t = %2.5f[ms]' % (i,float(1000*i*dt)))
     
     # Third-order TVD Scheme (Shu '01)
     q = update_ghost_pts(X,q)
