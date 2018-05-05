@@ -27,9 +27,8 @@ def init_cond(X_min,X_max,N,P4,T4,P1,T1,x_bnd=0.0):
                 T[i] = T1
         
         rho[i] = P[i]/(R*T[i])
-        #rho[i] = np.sin((X[i]-X_min)*2*np.pi/(X_max-X_min)) + 2
         u[i] = 0.0
-
+        
     #define the initial condition vector
     q_init[:,0] = rho
     q_init[:,1] = rho*u
@@ -37,19 +36,34 @@ def init_cond(X_min,X_max,N,P4,T4,P1,T1,x_bnd=0.0):
     
     return q_init, X
 
-'''	
-#Test init_cond
-q,x = init_cond(-17.0,2.0,100,70e5,300,1e5,300)
 
-import matplotlib.pyplot as plt
-import sys,os
+def eval_dp(q):
+#q is an Nxnv matrix with N grid points and nv variables   
 
+    import numpy as np
 
-plt.figure()
-plt.plot(x,q[:,0],'-b',linewidth=3.5)
-plt.show()
-sys.exit()
-'''
+    #primitive variables
+    gam = 1.4
+    rho = q[:,0]
+    u = q[:,1]/q[:,0]
+    e = q[:,2]
+    p = (gam-1.0)*(e-0.5*rho*u**2) - 1e5
+
+    return p
+    
+def eval_du(q):
+#q is an Nxnv matrix with N grid points and nv variables   
+
+    import numpy as np
+
+    #primitive variables
+    gam = 1.4
+    rho = q[:,0]
+    u = q[:,1]/q[:,0]
+    e = q[:,2]
+    p = (gam-1.0)*(e-0.5*rho*u**2) - 1e5
+
+    return u
 
 def phys_flux(q):
 #q is an Nxnv matrix with N grid points and nv variables   
@@ -86,6 +100,7 @@ def euler_1d_wavespeed(q):
     c = np.sqrt(gam*p/rho) 
 
     #define max wavespeed(s) on the grid for global LF splitting
+    
     ws = np.zeros(q.shape[1])
     for j in range(q.shape[1]):
         ws[j] = la.norm(u+(j-1)*c,np.inf) 
@@ -117,7 +132,7 @@ def langrange_extrap(x_in,q_in,x_ext):
         q_ext += q_in[i,:]*l_i
 
     return q_ext
-    
+   
 def update_ghost_pts(X,q):
 
     #assign the ghost cell values
@@ -125,8 +140,8 @@ def update_ghost_pts(X,q):
         q[i,0] =  q[6-i,0]
         q[i,1] = -q[6-i,1]
         q[i,2] =  q[6-i,2]
-        q[-(3-i),:] = q[-4,:]
-        #q[-(3-i):,:] = langrange_extrap(X[-(9-i):-(4-i)],q[-(9-i):-(4-i),:],X[-(3-i)])
+        if(i != 0):
+            q[-(3-i),:] = 1e7*(-1)**i
         
     return(q)
 
@@ -157,7 +172,7 @@ def char_numerical_flux(q):
     # -------------------------------------------------------------------------
 
     # Compute the max wavespeeds
-    ws = euler_1d_wavespeed(q[Ng:q.shape[0]-Ng,:])
+    #ws = euler_1d_wavespeed(q[Ng:q.shape[0]-Ng,:])
 
     # Initialize the arrays
     f_char_p = np.zeros((Nvar, stencil_size))
@@ -168,31 +183,22 @@ def char_numerical_flux(q):
     # Compute the f_char_p and f_char_m terms for phi_weno5
     # Compute the fifth order accurate weno flux-split terms
     # Add them together to obatin to find f_char_i_p_half
+    
     for i in range(N_x_p_half):
+        ws = euler_1d_wavespeed(q[i:i+stencil_size+1,:])
         qi, fi = proj_to_char(q[i:i+stencil_size+1,:], f[i:i+stencil_size+1,:], q_i_p_half[i])
         
         for j in range(stencil_size):
             f_char_p[:,j] = (0.5*( (fi[j,:]).T + (np.diag(ws)).dot((qi[j,:]).T) )).T
             f_char_m[:,j] = (0.5*( (fi[j+1,:]).T - (np.diag(ws)).dot((qi[j+1,:]).T) )).T
-            #print("(fi[j+1,:]) = ",(fi[j+1,:])," and (qi[j+1,:]) = ",(qi[j+1,:]))
 
         # Compute the i + 1/2 points flux
         for k in range(0, Nvar):
-            # print('\tPositive Flux')
-            # print('%d\t%3.4f\t%3.4f\t%3.4f\t%3.4f\t%3.4f' % (i,f_char_p[k,0],f_char_p[k,1],f_char_p[k,2],f_char_p[k,3],f_char_p[k,4]))
-            # print(" ---------------------- ")
-            # print('\tNegative Flux')
-            # print('%d\t%3.4f\t%3.4f\t%3.4f\t%3.4f\t%3.4f' % (i,f_char_m[k,0],f_char_m[k,1],f_char_m[k,2],f_char_m[k,3],f_char_m[k,4]))
-            #print("i =",i," k = ",k,"numerical char flux positive = ",phi_weno5(f_char_p[k,:],i)," negative = ",phi_weno5(f_char_m[k,::-1],i))
-            
-            f_char_i_p_half[i,k] = phi_weno5(f_char_p[k,:],i) + phi_weno5(f_char_m[k,::-1],i)
-            #print(" ==================================== ")
-            #print(" ==================================== ")
-            #print(" ")
-            # if(np.abs(f_char_i_p_half[i,k])>10**8):
-                # print("i = ",i," s = ",k," total number of x_{i+1/2} points = ",N_x_p_half)
-        
-        #input('waiting for you')
+            if(i == N_x_p_half-1):
+                f_char_i_p_half[i,k] = phi_weno5(f_char_p[k,:],1) + phi_weno5(f_char_m[k,::-1],-1)
+            else:
+                f_char_i_p_half[i,k] = phi_weno5(f_char_p[k,:],0) + phi_weno5(f_char_m[k,::-1],0)    
+    
     return f_char_i_p_half
 
 
@@ -210,15 +216,10 @@ def phi_weno5(f_char_p_s,flg):
     f1  = (-1/6)*f_i_m_1 + (5/6)*f_i + (1/3)*f_i_p_1
     f2  = (1/3)*f_i + (5/6)*f_i_p_1 - (1/6)*f_i_p_2
     
-    #print('%d\t%3.4f\t%3.4f\t%3.4f' % (flg,f0,f1,f2))
-    #print(" ---------------------- ")
-    
     beta_0 = (13/12)*(f_i_m_2 - 2*f_i_m_1 + f_i)**2 + (1/4)*(f_i_m_2 - 4*f_i_m_1 + 3*f_i)**2
     beta_1 = (13/12)*(f_i_m_1 - 2*f_i + f_i_p_1)**2 + (1/4)*(f_i_m_1 - f_i_p_1)**2
     beta_2 = (13/12)*(f_i - 2*f_i_p_1 + f_i_p_2)**2 + (1/4)*(3*f_i - 4*f_i_p_1 + f_i_p_2)**2
- 
-    #print('%d\t%1.4e\t%1.4e\t%1.4e' % (flg,beta_0,beta_1,beta_2))
- 
+
     epsilon = 1e-6
     
     w0_tilde = 0.1/(epsilon + beta_0)**2
@@ -228,24 +229,8 @@ def phi_weno5(f_char_p_s,flg):
     w0 = w0_tilde/(w0_tilde + w1_tilde + w2_tilde)
     w1 = w1_tilde/(w0_tilde + w1_tilde + w2_tilde)
     w2 = w2_tilde/(w0_tilde + w1_tilde + w2_tilde)
-    
-    #hardcode optimal linear weights
-    #w0 = 0.1; w1 = 0.6; w2 = 0.3;
-    
-    #print('%d\t%3.4f\t%3.4f\t%3.4f' % (flg,w0,w1,w2))
-    
+        
     f_char_i_p_half_p_s = w0*f0 + w1*f1 + w2*f2
-    
-    # if(np.abs(f_char_i_p_half_p_s)>10**8):
-        # print("f_char_p_s[0] = ",f_char_p_s[0]," flux direction = ",flg)
-        # print("f_char_p_s[1] = ",f_char_p_s[1])
-        # print("f_char_p_s[2] = ",f_char_p_s[2])
-        # print("f_char_p_s[3] = ",f_char_p_s[3])
-        # print("f_char_p_s[0] = ",f_char_p_s[4])
-        # print(" --- ")
-        # print("w0 = ",w0," f0 = ",f0," flux direction = ",flg) 
-        # print("w1 = ",w1," f1 = ",f1)         
-        # print("w2 = ",w2," f2 = ",f2) 
         
     return f_char_i_p_half_p_s
     
@@ -287,7 +272,7 @@ def proj_to_char(q,f,q_st):
 
     return q_char,f_char
 
-def spatial_rhs(f_char,q_cons,dx):
+def spatial_rhs(f_char,q_cons,dx,X):
     '''
     f_char is a Ni x nv matrix of the characteristic flux only at interior adjacent flux interfaces
     q_cons is a Np x nv matrix of the conservative variables full domain
@@ -324,22 +309,74 @@ def spatial_rhs(f_char,q_cons,dx):
         R[i,2,1] = 0.5*u**2
         R[i,2,2] = c**2/(gam-1.0)+0.5*u**2+u*c
 
-    qdot_cons = np.zeros((N-1,f_char.shape[1]))
+    qdot_cons = np.zeros((N,f_char.shape[1]))
     for i in range(N-1):   
-        
-        #update the boundary condition mask M
-        M = np.eye(3) 
-        #if(i==N-2): M[0,0] = 0
         
         # Local Right Eigen Matrices
         R_p_half = R[i+1,:,:]
         R_m_half = R[i,:,:]
         
         # The local qdot
-        qdot_cons[i,:] = (-1/dx)*( R_p_half.dot(M.dot((f_char[i+1,:]).T)) - R_m_half.dot(M.dot((f_char[i,:]).T)) ).T
-        
+        qdot_cons[i,:] = (-1/dx)*( R_p_half.dot((f_char[i+1,:]).T) - R_m_half.dot((f_char[i,:]).T) ).T
+
+    # Compute qdot at non-reflecting boundary
+    qdot_cons[N-1,:] = non_reflecting_qdot(np.array(q_cons[-8:-3,:]),dx)
+    
     return qdot_cons
 
+# def central_scheme(q,h):
+    
+    # qdot = -(1/h)
+    
+def non_reflecting_qdot(q,h):
+    
+    import numpy as np
+    
+    #primitive variables
+    gam = 1.4
+    rhoarr = q[:,0]
+    uarr = q[:,1]/q[:,0]
+    earr = q[:,2]
+    parr = (gam-1.0)*(earr-0.5*rhoarr*uarr**2)
+    carr = np.sqrt(gam*parr/rhoarr) 
+
+    R = np.zeros((3,3))
+    
+    u = uarr[-1]
+    rho = rhoarr[-1]
+    c = carr[-1] 
+    
+    #matrix of right eigenvectors of A (eigenvalues in order u-c, u, and u+c)
+    R[0,:] = 1.0
+    R[1,0] = u-c
+    R[1,1] = u
+    R[1,2] = u+c
+    R[2,0] = c**2/(gam-1.0)+0.5*u**2-u*c
+    R[2,1] = 0.5*u**2
+    R[2,2] = c**2/(gam-1.0)+0.5*u**2+u*c    
+    
+    # Compute spatial gradients
+    rhodot = (3*rhoarr[-5]-16*rhoarr[-4]+36*rhoarr[-3]-48*rhoarr[-2]+25*rhoarr[-1])/(12*1.0*h**1)
+    udot = (3*uarr[-5]-16*uarr[-4]+36*uarr[-3]-48*uarr[-2]+25*uarr[-1])/(12*1.0*h**1)
+
+    #rhodot = (1*rhoarr[-3]-4*rhoarr[-2]+3*rhoarr[-1])/(2*h)
+    #udot = (1*uarr[-3]-4*uarr[-2]+3*uarr[-1])/(2*h)
+    
+    f1 = 0
+    f2 = 1
+    f3 = 1
+    
+    # Compute the wave amplitudes
+    L1 = -f1*(c-u)*(c*rhodot - gam*rho*udot)/(2*c*gam)
+    L2 =  f2*(-1+gam)*u*rhodot/gam
+    L3 =  f3*(c+u)*(c*rhodot + gam*rho*udot)/(2*c*gam)
+    
+    qdot = -(R.dot(np.array([[L1],[L2],[L3]]))).T
+    
+    #print(qdot)
+    
+    return qdot
+    
 def q1d_afunc(x,r,makePlot=False,demo=False):
 #computes 1/A*dA/dx based on a provided geometry R(x)
 
