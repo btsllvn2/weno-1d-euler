@@ -629,7 +629,7 @@ def Shock_Tube_Exact(X,P4,T4,P1,T1,time,mode='data'):
             else:
 
                 #define a locator variable
-                xi = (x[i]-x_fR)/(x_ct-x_fR)
+                xi = (x[i]-x_fR)/(x_ct-x_fR+eps)
                 
                 #x between shock and contact discontinuity
                 if (xi>1.0):

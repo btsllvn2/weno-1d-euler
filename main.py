@@ -49,10 +49,10 @@ gam = 1.4
 R = 286.9
 
 # Specify the number of points in the domain (includes ghost points)
-N = 200
+N = 400
 
 # Specify the overall domain size
-X_min,X_max = -1.0,1.0
+X_min,X_max = -2.0,1.0
 
 # Specifiy target CFL and total number of time steps
 CFL = 0.5
@@ -206,6 +206,7 @@ for i in range(1,Nt+1):
         if (saveFrames): plt.savefig('frames/frame%08d.png' % int(i/plot_freq))
         plt.pause(eps)
 
+print('\nSolution computed. Building xt-plots...')
 
 #compute XT-flow variables for plotting
 plt.ioff()
@@ -216,20 +217,21 @@ E = Q[:,2,:].T
 P = (gam-1)*(E-0.5*RHO*U**2)
 M = np.sqrt(RHO*U**2/(gam*P))
 ENTROPY = P/RHO**gam
-T = P/(R*RHO)
-
-#title options
-if (runQuasi1D):
-    title_str = r'GALCIT Ludwieg Tube ($P_{41}$=%d)' % P_41
-else:
-    title_str = r"Sod's Shock Tube Problem Tube ($P_{41}$=%d)" % P_41
+TEMP = P/(R*RHO)
+f_num = 3
 
 #generate XT-plots
-f_num = 3
 X,T = np.meshgrid(x_vec,1e3*t_vec)
 def make_XT_plot(var,v_label):
 
+    #used outside the function
     global f_num
+
+    #conditional formatting
+    if (runQuasi1D):
+        title_str = r'GALCIT Ludwieg Tube ($P_{41}$=%d)' % P_41
+    else:
+        title_str = r"Sod's Shock Tube Problem Tube ($P_{41}$=%d)" % P_41
 
     plt.figure(f_num)
     plt.contourf(X,T,var,300,cmap='jet')
@@ -238,15 +240,14 @@ def make_XT_plot(var,v_label):
     plt.ylabel(r'Time [ms]',fontsize=12)
     cb = plt.colorbar()
     cb.set_label(v_label, labelpad=20, rotation=-90)
-    plt.savefig('fig_%d.png' % f_num)
+    plt.savefig('fig_%d.pdf' % f_num)
     f_num += 1
 
     return
 
 #make an xt-plot for each variable
-var_lst = [RHO,P,T,M,E,ENTROPY]
+var_lst = [RHO,P,TEMP,M,E,ENTROPY]
 label_lst = [r'Density [kg/m^3]',r'Pressure [Pa]',r'Temperature [K]',r'Mach [-]',r'Specific Energy',r'Measure of Entropy']
 for i in range(len(var_lst)): make_XT_plot(var_lst[i],label_lst[i])
-
-print('\nProgram complete.\n')
+print('Program complete.\n')
 plt.show()
