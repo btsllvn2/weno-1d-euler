@@ -23,7 +23,7 @@ import sys,os
 #========================================
 noDisplay = False
 saveFrames = False
-runQuasi1D = False
+runQuasi1D = True
 
 #supress display output
 if (noDisplay):
@@ -50,7 +50,7 @@ X_min,X_max = -17.0,1.0
 
 # Specifiy CFL and total number of time steps
 CFL = 0.5
-Nt = 300
+Nt = 200
 
 # Specify the Pressure and temperature values of the initial condition
 P1 = 1e4
@@ -190,15 +190,6 @@ for i in range(1,Nt+1):
         if (saveFrames): plt.savefig('frames/frame%08d.png' % int(i/plot_freq))
         plt.pause(eps)
 
-fig, ax = plt.subplots()
-line, = ax.plot(X[3:N-3],Q[:,0,0], color='b', marker='o', linewidth=2)
-#ax.grid(ydata=[0], color='b', linestyle='-', linewidth=1)
-plt.xlabel(r'$x$')
-plt.ylabel(r'$\rho(x,t)$')
-plt.xlim(-2.0,2.0)
-plt.title(r'Density Animation')
-def animate(n):
-    line.set_ydata(Q[:,0,n])
-    return line,
-ani = animation.FuncAnimation(fig, animate, np.arange(1, Nt),interval=20, blit=True)
-plt.show()  
+print('\nProgram complete.\n')
+plt.ioff()
+plt.show()
