@@ -21,9 +21,9 @@ import sys,os
 #  Main options for running the code:
 #
 #========================================
-noDisplay = False
-saveFrames = False
-runQuasi1D = True
+noDisplay = True
+saveFrames = True
+runQuasi1D = False
 
 #supress display output
 if (noDisplay):
@@ -43,14 +43,14 @@ gam = 1.4
 R = 286.9
 
 # Specify the number of points in the domain (includes ghost points)
-N = 1000
+N = 1500
 
 # Specify the domain size
-X_min,X_max = -17.0,1.0
+X_min,X_max = -10.0,1.0
 
 # Specifiy CFL and total number of time steps
 CFL = 0.5
-Nt = 200
+Nt = 600
 
 # Specify the Pressure and temperature values of the initial condition
 P1 = 1e4
@@ -58,13 +58,22 @@ P4 = 1e5
 T1 = 300
 T4 = 300
 
-#example initial conditions (Sod '78)
-rho4 = 1.0
-P4 = 1e5
-T4 = P4/(R*rho4)
-rho1 = 0.125
-P1 = 1e4
-T1 = P1/(R*rho1)
+#initial condition
+if(runQuasi1D):
+    rho4 = 1.0
+    P4 = 1e7
+    T4 = P4/(R*rho4)
+    rho1 = 0.125
+    P1 = 1e4
+    T1 = P1/(R*rho1)
+else:
+    rho4 = 1.0
+    P4 = 1e5
+    T4 = P4/(R*rho4)
+    rho1 = 0.125
+    P1 = 1e4
+    T1 = P1/(R*rho1)
+P_41 = int(P4/P1)
 
 #compute maximum possible velocity for initial temperature
 u_max = np.sqrt(2*gam*R*max(T4,T1)/(gam-1))
@@ -90,10 +99,9 @@ if (runQuasi1D):
                          [0.543973,   0.0579985],
                          [0.700000,   0.0579985],
                          [2.000000,   0.0579985]])
-    x_throat = 0.0828279
 
     #compute scaling factor (vector) for Quasi-1D source term on the grid "X"
-    F_vec = areaFunc(Geom_Dat[:,0],Geom_Dat[:,1],X[3:-3],True)
+    F_vec,x_throat = areaFunc(Geom_Dat[:,0],Geom_Dat[:,1],X[3:-3],True)
 else:
 
     #force the Q1D source term to be identically zero
@@ -128,17 +136,17 @@ M_plt = np.sqrt(rho_plt*u_plt**2/(gam*p_plt))
 plt.ion()
 plt.figure()
 if(runQuasi1D):
-    plt.title('Quasi-1D Euler Equations Using WENO-JS (t=%2.3f[ms])' % 0.0)
+    plt.title('Solution to GALCIT Nozzle Flow Using WENO-JS ($P_{41}$=%d, t=%2.3f[ms])' %(P_41,0.0))
     plt.plot(x_throat*np.ones(2),[-10,10],'--k',linewidth=1.5)
     plt.plot(50*np.array([-1,1]),[1.0,1.0],'--k',linewidth=1.5)
     line2, = plt.plot(X[3:N-3],M_plt,'-b',label='WENO-JS',linewidth=3.0)
     plt.ylabel('Mach')
     plt.xlim(-0.1,0.7)
-    plt.ylim(0,6.0)
+    plt.ylim(0,5.0)
 else:
     line1, = plt.plot(X[3:N-3],Q_exact[3:N-3,0,0],'-k',linewidth=1.0,label='Exact Solution')
     line2, = plt.plot(X[3:N-3],q_init[3:N-3,0],'ob',label='WENO-JS')
-    plt.title('1D Euler Equations Using WENO-JS (t=%2.3f[ms])' % 0.0)
+    plt.title('1D Euler Equations Using WENO-JS ($P_{41}$=%d, t=%2.3f[ms])' % (P_41,0.0))
     plt.ylabel('rho')
     plt.xlim(-1,1)
     #plt.ylim(0,2.0)
@@ -181,12 +189,12 @@ for i in range(1,Nt+1):
     #real-time animation   
     if(i%plot_freq==0):
         if(runQuasi1D): 
-            plt.title('Quasi-1D Euler Equations Using WENO-JS (t=%2.3f[ms])' % float(1000*i*dt))
+            plt.title('Solution to GALCIT Nozzle Flow Using WENO-JS ($P_{41}$=%d, t=%2.3f[ms])' % (P_41,float(1000*i*dt)))
             line2.set_ydata(M_plt)
         else:
             line1.set_ydata(Q_exact[3:N-3,0,i])
             line2.set_ydata(q[3:N-3,0])
-            plt.title('1D Euler Equations Using WENO-JS (t=%2.3f[ms])' % float(1000*i*dt))
+            plt.title('1D Euler Equations Using WENO-JS ($P_{41}$=%d, t=%2.3f[ms])' % (P_41,float(1000*i*dt)))
         if (saveFrames): plt.savefig('frames/frame%08d.png' % int(i/plot_freq))
         plt.pause(eps)
 

@@ -216,7 +216,8 @@ def phi_weno5(f_char_p_s,flg):
     beta_2 = (13/12)*(f_i - 2*f_i_p_1 + f_i_p_2)**2 + (1/4)*(3*f_i - 4*f_i_p_1 + f_i_p_2)**2
 
     #unscaled nonlinear weights 
-    epsilon = 1e-6
+    #epsilon = 1e-6
+    epsilon = 1e-2
     w0_tilde = 0.1/(epsilon + beta_0)**2
     w1_tilde = 0.6/(epsilon + beta_1)**2
     w2_tilde = 0.3/(epsilon + beta_2)**2
@@ -401,7 +402,7 @@ def areaFunc(x,r,X_vec,makePlot=False,demo=False):
         plt.ylim(-0.1,0.1)
         plt.xlabel(r'$x\;[m]$',fontsize=15)
         plt.ylabel(r'$r\;[m]$',fontsize=15)
-        plt.title(r'GALCIT Ludwieg Tube - Nozzle',fontsize=17)
+        plt.title(r'GALCIT Ludwieg Tube Mach 4 Nozzle',fontsize=17)
         plt.legend(fontsize=12)
         plt.savefig('nozzle.pdf')
         plt.savefig('nozzle.png')
@@ -411,7 +412,35 @@ def areaFunc(x,r,X_vec,makePlot=False,demo=False):
     l_func = interp.pchip(x,np.log(np.pi*r**2))
     F_vec = l_func.__call__(X_vec,1)
 
-    return F_vec
+    #compute the exact x-location of the throat
+    def Res(x): return l_func.__call__(x,1)
+    print('Computing exact location of the throat...')
+    x_th = 0.05; cntr=0; err=1.0;
+    x_l = 0.05; x_r = 0.20
+    while (abs(err)>1e-10):
+
+        #update the counter
+        cntr += 1 
+    
+        #use false-position method to estimate the root
+        x_new = (x_l*Res(x_r)-x_r*Res(x_l))/(Res(x_r)-Res(x_l))
+        #print('x_update = ',x_new)
+        if (Res(x_new)*Res(x_r)>0):
+            x_r = x_new
+        else:
+            x_l = x_new
+        err = abs(x_l-x_r)
+        #print('    N = %d, x_th = %1.6f, e = %1.6e' % (cntr,x_new,err))
+
+        #limit total number of iterations
+        if (cntr == 100):
+            print('\n  **Iteration limit exceeded (e = %1.6e)\n' % err)
+            break
+    x_th = x_new
+
+    print('Location of the throat is x_th = %2.8f[m]' % x_th)
+    
+    return F_vec,x_th
 
 def Shock_Tube_Exact(X,P4,T4,P1,T1,time,mode='data'):
     '''
