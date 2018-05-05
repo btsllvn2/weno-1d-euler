@@ -23,7 +23,8 @@ import sys,os
 #========================================
 noDisplay = False
 saveFrames = False
-runQuasi1D = True
+runQuasi1D = False
+plot_freq = 1
 
 #supress display output
 if (noDisplay):
@@ -49,44 +50,32 @@ R = 286.9
 # Specify the number of points in the domain (includes ghost points)
 N = 1500
 
-# Specify the domain size
+# Specify the overall domain size
 X_min,X_max = -10.0,1.0
 
-# Specifiy CFL and total number of time steps
+# Specifiy target CFL and total number of time steps
 CFL = 0.5
 Nt = 1200
 
 # Specify the Pressure and temperature values of the initial condition
-P1 = 1e4
-P4 = 1e5
-T1 = 300
-T4 = 300
+P1,P4,T1,T4 = 1e4,1e5,300,300
 
-#initial condition
-if(runQuasi1D):
+# [STEP 1]: Assign the initial condition (diaphram at x = 0; Ghost cells populated with large discontinuity)
+if (runQuasi1D):
+
+    #set the initial condition
     rho4 = 1.0
     P4 = 1e7
     T4 = P4/(R*rho4)
     rho1 = 0.125
     P1 = 1e4
     T1 = P1/(R*rho1)
-else:
-    rho4 = 1.0
-    P4 = 1e5
-    T4 = P4/(R*rho4)
-    rho1 = 0.125
-    P1 = 1e4
-    T1 = P1/(R*rho1)
-P_41 = int(P4/P1)
+    q_init,X,dx = init_cond(X_min,X_max,N,P4,T4,P1,T1)
 
-#compute maximum possible velocity for initial temperature
-u_max = np.sqrt(2*gam*R*max(T4,T1)/(gam-1))
-print('Maximum possible velocity on domain: u_max = %4.3f [m/s]' % u_max)
-
-# [STEP 1]: Assign the initial condition (diaphram at x = 0; Ghost cells populated with large discontinuity)
-q_init,X,dx = init_cond(X_min,X_max,N,P4,T4,P1,T1)
-#run the code either in quasi-1D mode or in true 1D mode
-if (runQuasi1D):
+    #compute a stable timestep
+    u_max = np.sqrt(2*gam*R*max(T4,T1)/(gam-1))
+    dt = CFL*dx/u_max
+    T_final = Nt*dt
 
     #define the shock-tube and nozzle geometry
     Geom_Dat = np.array([[-17.00000,  0.0568613],
@@ -108,15 +97,21 @@ if (runQuasi1D):
     F_vec,x_throat,Mach_vec = areaFunc(Geom_Dat[:,0],Geom_Dat[:,1],X[3:-3],True)
 else:
 
-    #force the Q1D source term to be identically zero
-    F_vec = np.zeros(X[3:-3].shape)
+    #set the initial condition
+    rho4 = 1.0
+    P4 = 1e5
+    T4 = P4/(R*rho4)
+    rho1 = 0.125
+    P1 = 1e4
+    T1 = P1/(R*rho1)
+    q_init,X,dx = init_cond(X_min,X_max,N,P4,T4,P1,T1)
 
-#determine the time parameters
-dt = CFL*dx/u_max
-T_final = Nt*dt 
+    #compute a stable timestep
+    u_max = np.sqrt(2*gam*R*max(T4,T1)/(gam-1))
+    dt = CFL*dx/u_max
+    T_final = Nt*dt 
 
-#compute the exact solution for the 1D shock-tube problem
-if (not runQuasi1D):
+    #compute the exact solution for the 1D shock-tube problem
     t_exact = np.linspace(0,T_final,Nt+1)
     Q_exact = Shock_Tube_Exact(X,P4,T4,P1,T1,t_exact)
     rho_ex = Q_exact[3:-3,0,:]
@@ -124,6 +119,13 @@ if (not runQuasi1D):
     e_ex = Q_exact[3:-3,2,:]
     p_ex = (gam-1.0)*(e_ex-0.5*rho_ex*u_ex**2)
     M_ex = np.sqrt(rho_ex*u_ex**2/(gam*p_ex))
+
+    #force the Q1D source term to be identically zero
+    F_vec = np.zeros(X[3:-3].shape)
+
+
+print('Maximum possible velocity on domain: u_max = %4.3f [m/s]' % u_max)
+P_41 = int(P4/P1)
 
 #allocate arrays for updating the solution
 q = np.copy(q_init)
@@ -142,13 +144,10 @@ plt.ion()
 plt.figure()
 if(runQuasi1D):
     plt.title('Solution to GALCIT Nozzle Flow Using WENO-JS ($P_{41}$=%d, t=%2.3f[ms])' %(P_41,0.0))
-    #plt.plot(x_throat*np.ones(2),[-10,10],'--k',linewidth=1.5)
-    #plt.plot(50*np.array([-1,1]),[1.0,1.0],'--k',linewidth=1.5)
     line1, = plt.plot(X[3:N-3],Mach_vec,'--k',label='Isentropic Solution',linewidth=1.0)
     line2, = plt.plot(X[3:N-3],M_plt,'-b',label='WENO-JS',linewidth=3.0)
     plt.legend(loc=2)
     plt.ylabel('Mach')
-    #plt.annotate('Throat location',xy=(0.09,4),xytext=(0.25,4.05),fontsize=15,arrowprops=dict(facecolor='black', width=1.0,shrink=0.05))
     plt.xlim(-0.1,0.7)
     plt.ylim(0,5.0)
 else:
@@ -157,14 +156,13 @@ else:
     plt.title('1D Euler Equations Using WENO-JS ($P_{41}$=%d, t=%2.3f[ms])' % (P_41,0.0))
     plt.ylabel('rho')
     plt.xlim(-1,1)
-    #plt.ylim(0,2.0)
     plt.legend()
 plt.xlabel('x[m]')
+plt.draw()
 plt.savefig('frames/frame%08d.png' % 0)
 plt.pause(eps)
 
 #time integration
-plot_freq = 1
 print('\nStarting time integration...')
 for i in range(1,Nt+1):
 
