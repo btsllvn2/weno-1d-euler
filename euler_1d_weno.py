@@ -16,8 +16,15 @@ def init_cond(X_min,X_max,N,P4,T4,P1,T1,x_bnd=0.0):
     P = np.zeros(N)
     T = np.zeros(N)
 
+    #define the grid with N total points (ghost points outside domain)
+    X = np.zeros(N)
+    X[3:-3] = np.linspace(X_min,X_max,N-6)
+    dx = X[4]-X[3]
+    for i in range(3):
+        X[i] = X_min+(i-3)*dx
+        X[-(i+1)] = X_max+(3-i)*dx 
+
     #initialize primative variables
-    X = np.linspace(X_min,X_max,N)
     for i in range(N):
         if(X[i]<=x_bnd):
                 P[i] = P4
@@ -34,9 +41,11 @@ def init_cond(X_min,X_max,N,P4,T4,P1,T1,x_bnd=0.0):
     q_init[:,1] = rho*u
     q_init[:,2] = P/(gam-1.0) + 0.5*rho*u**2
     
-    return q_init, X
+    print('Intiial condition generated successfully.')
+    
+    return q_init, X, dx
 
-
+    
 def eval_dp(q):
 #q is an Nxnv matrix with N grid points and nv variables   
 
@@ -64,6 +73,7 @@ def eval_du(q):
     p = (gam-1.0)*(e-0.5*rho*u**2) - 1e5
 
     return u
+
 
 def phys_flux(q):
 #q is an Nxnv matrix with N grid points and nv variables   
@@ -99,7 +109,7 @@ def euler_1d_wavespeed(q):
     p = (gam-1.0)*(e-0.5*rho*u**2)
     c = np.sqrt(gam*p/rho) 
 
-    #define max wavespeed(s) on the grid for global LF splitting
+    #define max wavespeed(s) on the grid for LF splitting
     
     ws = np.zeros(q.shape[1])
     for j in range(q.shape[1]):
@@ -107,9 +117,8 @@ def euler_1d_wavespeed(q):
 
     return ws
 
-
 def langrange_extrap(x_in,q_in,x_ext):
-#function which computes the 5th-order Lagrange extrapolated solution 
+# Function which computes the 5th-order Lagrange extrapolated solution 
 # x_in is an Npx1 vector of Np grid points points
 # q_in is an NpxNv matrix with Np points and Nv solution variables   
 # x_ext is an 1x1 scalar of the desired point to evaluate L(x)
@@ -203,35 +212,47 @@ def char_numerical_flux(q):
 
 
 def phi_weno5(f_char_p_s,flg):
+    '''
+    Function which computes a 5th-order WENO reconstruction of the numerical
+    flux at location x_{i+1/2}, works regardless of the sign of f'(u)
+    '''
 
     import numpy as np
-    
+   
+    #assign the fluxes at each point in the full stencil 
     f_i_m_2 = f_char_p_s[0]
     f_i_m_1 = f_char_p_s[1]
     f_i     = f_char_p_s[2]
     f_i_p_1 = f_char_p_s[3]
     f_i_p_2 = f_char_p_s[4]
     
+    #estimate of f_{i+1/2} for each substencil
     f0 = (1/3)*f_i_m_2 - (7/6)*f_i_m_1 + (11/6)*f_i
     f1  = (-1/6)*f_i_m_1 + (5/6)*f_i + (1/3)*f_i_p_1
     f2  = (1/3)*f_i + (5/6)*f_i_p_1 - (1/6)*f_i_p_2
     
+    #smoothness indicators for the solution on each substencil 
     beta_0 = (13/12)*(f_i_m_2 - 2*f_i_m_1 + f_i)**2 + (1/4)*(f_i_m_2 - 4*f_i_m_1 + 3*f_i)**2
     beta_1 = (13/12)*(f_i_m_1 - 2*f_i + f_i_p_1)**2 + (1/4)*(f_i_m_1 - f_i_p_1)**2
     beta_2 = (13/12)*(f_i - 2*f_i_p_1 + f_i_p_2)**2 + (1/4)*(3*f_i - 4*f_i_p_1 + f_i_p_2)**2
 
+    #unscaled nonlinear weights 
     epsilon = 1e-6
-    
     w0_tilde = 0.1/(epsilon + beta_0)**2
     w1_tilde = 0.6/(epsilon + beta_1)**2
     w2_tilde = 0.3/(epsilon + beta_2)**2
     
+    #scaled nonlinear weights
     w0 = w0_tilde/(w0_tilde + w1_tilde + w2_tilde)
     w1 = w1_tilde/(w0_tilde + w1_tilde + w2_tilde)
     w2 = w2_tilde/(w0_tilde + w1_tilde + w2_tilde)
-        
+    
+    #hardcode optimal linear weights
+    #w0 = 0.1; w1 = 0.6; w2 = 0.3;
+   
+    #linear convex combination of (3) substencil reconstructions
     f_char_i_p_half_p_s = w0*f0 + w1*f1 + w2*f2
-        
+
     return f_char_i_p_half_p_s
     
 def proj_to_char(q,f,q_st):
@@ -272,7 +293,8 @@ def proj_to_char(q,f,q_st):
 
     return q_char,f_char
 
-def spatial_rhs(f_char,q_cons,dx,X):
+def spatial_rhs(f_char,q_cons,dx):
+
     '''
     f_char is a Ni x nv matrix of the characteristic flux only at interior adjacent flux interfaces
     q_cons is a Np x nv matrix of the conservative variables full domain
@@ -300,7 +322,6 @@ def spatial_rhs(f_char,q_cons,dx,X):
         c = np.sqrt(gam*p/rho) 
 
         #matrix of right eigenvectors of A (eigenvalues in order u-c, u, and u+c)
-        
         R[i,0,:] = 1.0
         R[i,1,0] = u-c
         R[i,1,1] = u
@@ -309,7 +330,7 @@ def spatial_rhs(f_char,q_cons,dx,X):
         R[i,2,1] = 0.5*u**2
         R[i,2,2] = c**2/(gam-1.0)+0.5*u**2+u*c
 
-    qdot_cons = np.zeros((N,f_char.shape[1]))
+    rhs = np.zeros((N,f_char.shape[1]))
     for i in range(N-1):   
         
         # Local Right Eigen Matrices
@@ -317,16 +338,12 @@ def spatial_rhs(f_char,q_cons,dx,X):
         R_m_half = R[i,:,:]
         
         # The local qdot
-        qdot_cons[i,:] = (-1/dx)*( R_p_half.dot((f_char[i+1,:]).T) - R_m_half.dot((f_char[i,:]).T) ).T
+        rhs[i,:] = (-1/dx)*( R_p_half.dot((f_char[i+1,:]).T) - R_m_half.dot((f_char[i,:]).T) ).T
 
     # Compute qdot at non-reflecting boundary
-    qdot_cons[N-1,:] = non_reflecting_qdot(np.array(q_cons[-8:-3,:]),dx)
+    rhs[N-1,:] = non_reflecting_qdot(np.array(q_cons[-8:-3,:]),dx)
     
-    return qdot_cons
-
-# def central_scheme(q,h):
-    
-    # qdot = -(1/h)
+    return rhs
     
 def non_reflecting_qdot(q,h):
     
@@ -356,28 +373,50 @@ def non_reflecting_qdot(q,h):
     R[2,2] = c**2/(gam-1.0)+0.5*u**2+u*c    
     
     # Compute spatial gradients
-    rhodot = (3*rhoarr[-5]-16*rhoarr[-4]+36*rhoarr[-3]-48*rhoarr[-2]+25*rhoarr[-1])/(12*1.0*h**1)
-    udot = (3*uarr[-5]-16*uarr[-4]+36*uarr[-3]-48*uarr[-2]+25*uarr[-1])/(12*1.0*h**1)
-
-    #rhodot = (1*rhoarr[-3]-4*rhoarr[-2]+3*rhoarr[-1])/(2*h)
-    #udot = (1*uarr[-3]-4*uarr[-2]+3*uarr[-1])/(2*h)
+    drho_dx = (3*rhoarr[-5]-16*rhoarr[-4]+36*rhoarr[-3]-48*rhoarr[-2]+25*rhoarr[-1])/(12*1.0*h**1)
+    du_dx = (3*uarr[-5]-16*uarr[-4]+36*uarr[-3]-48*uarr[-2]+25*uarr[-1])/(12*1.0*h**1)
     
     f1 = 0
     f2 = 1
     f3 = 1
     
     # Compute the wave amplitudes
-    L1 = -f1*(c-u)*(c*rhodot - gam*rho*udot)/(2*c*gam)
-    L2 =  f2*(-1+gam)*u*rhodot/gam
-    L3 =  f3*(c+u)*(c*rhodot + gam*rho*udot)/(2*c*gam)
+    L1 = -f1*(c-u)*(c*drho_dx - gam*rho*du_dx)/(2*c*gam)
+    L2 =  f2*(-1+gam)*u*drho_dx/gam
+    L3 =  f3*(c+u)*(c*drho_dx + gam*rho*du_dx)/(2*c*gam)
     
     qdot = -(R.dot(np.array([[L1],[L2],[L3]]))).T
     
-    #print(qdot)
-    
     return qdot
+
+#source term which accounts for quasi-1D area variation
+def q1d_rhs(f_vec,q): 
+
+    import numpy as np
+
+    #primitive variables
+    gam = 1.4
+    rho = q[:,0]
+    u = q[:,1]/q[:,0]
+    e = q[:,2]
+    p = (gam-1.0)*(e-0.5*rho*u**2)
+
+    #compute the unscaled Q1D source term
+    flux = np.zeros(q.shape)
+    flux[:,0] = rho*u
+    flux[:,1] = rho*u**2
+    flux[:,2] = u*(p+e)
+
+    #compute the rhs matrix
+    rhs = np.zeros(flux.shape)
+    for i in range(q.shape[0]):
+        rhs[i,:] = -f_vec[i]*flux[i,:]
+
+    return rhs
+
     
-def q1d_afunc(x,r,makePlot=False,demo=False):
+f_num = 1
+def areaFunc(x,r,X_vec,makePlot=False,demo=False):
 #computes 1/A*dA/dx based on a provided geometry R(x)
 
     from scipy.interpolate import splrep, splev
@@ -388,40 +427,43 @@ def q1d_afunc(x,r,makePlot=False,demo=False):
 
     global f_num
 
+    #relevant constants
+    eps = np.finfo(float).eps
+    gam = 1.4
+    R = 286.9
+    h = 1e-30
+
     #defensive programming
     for vec in (x,r):
         vec = np.array(vec)
 
+    # GALGIT Ludwieg tube geometry + Mach 5 nozzle
+    if (demo): 
+        X = np.array([[-17.00000,  0.0568613],
+                      [-0.445792,  0.0568613],
+                      [-0.100000,  0.0568613],
+                      [0.0295679,  0.0568613],
+                      [0.0384761,  0.0369598],
+                      [0.0538287,  0.0233131],
+                      [0.0828279,  0.0159212],  #<----throat location
+                      [0.131160,   0.0233131],
+                      [0.203942,   0.0363912],
+                      [0.292646,   0.0471948],
+                      [0.405800,   0.0557240],
+                      [0.543973,   0.0579985],
+                      [0.700000,   0.0579985],
+                      [2.000000,   0.0579985]])
+        x,r = X[:,0],X[:,1]
+
+    #define a function which interpolates the given radius data points
+    r_func = interp.pchip(x,r)
+
     #demo inputs
     if (makePlot):
   
-        # GALGIT Ludwieg tube geometry + Mach 5 nozzle
-        if (demo): 
-            X = np.array([[-17.00000,  0.0568613],
-                          [-0.445792,  0.0568613],
-                          [-0.100000,  0.0568613],
-                          [0.0295679,  0.0568613],
-                          [0.0384761,  0.0369598],
-                          [0.0538287,  0.0233131],
-                          [0.0828279,  0.0159212],  #<----throat location
-                          [0.131160,   0.0233131],
-                          [0.203942,   0.0363912],
-                          [0.292646,   0.0471948],
-                          [0.405800,   0.0557240],
-                          [0.543973,   0.0579985],
-                          [0.700000,   0.0579985],
-                          [2.000000,   0.0579985]])
-            x,r = X[:,0],X[:,1]
-
-        ##use LaTeX formatting for titles and axes
-        #plt.rc('text', usetex=True)
-        #plt.rc('font', family='serif')
-        #plt.rcParams['figure.figsize'] = (10.0,6.0)
-
         #plot the discrete points and the phcip spline
-        plt.figure()
+        plt.figure(f_num)
         x_plt = np.linspace(x.min(),x.max(),int(1e4))
-        r_func = interp.pchip(x,r)
         plt.plot(x_plt,r_func.__call__(x_plt),'-b',linewidth=3.0,label='PCHIP Interpolant',zorder=1)
         plt.plot(x_plt,-r_func.__call__(x_plt),'-b',linewidth=3.0,zorder=2)
         plt.scatter(x,r,c='r',label='Imported Data Points',zorder=3)
@@ -431,20 +473,86 @@ def q1d_afunc(x,r,makePlot=False,demo=False):
         plt.ylim(-0.1,0.1)
         plt.xlabel(r'$x\;[m]$',fontsize=15)
         plt.ylabel(r'$r\;[m]$',fontsize=15)
-        plt.title(r'GALCIT Ludwieg Tube - Nozzle',fontsize=17)
+        plt.title(r'GALCIT Ludwieg Tube Mach 4 Nozzle',fontsize=17)
         plt.legend(fontsize=12)
-        plt.savefig('fig_%d.pdf' % f_num)
-        #plt.show()
+        plt.savefig('nozzle.pdf')
+        plt.savefig('nozzle.png')
         f_num += 1
 
-    #create an interpolant for log[A(x)] 
+    #create and differentiate the PCHIP interpolant for log[A(x)] 
     l_func = interp.pchip(x,np.log(np.pi*r**2))
+    F_vec = l_func.__call__(X_vec,1)
 
-    #output the derivative function
-    return l_func.__call__(x,1)
+    #compute the exact x-location of the throat
+    def Res(x): return l_func.__call__(x,1)
+    print('Computing exact location of the throat...')
+    x_th = 0.05; cntr=0; err=1.0;
+    x_l = 0.05; x_r = 0.20
+    while (abs(err)>eps):
 
+        #update the counter
+        cntr += 1 
+    
+        #use false-position method to estimate the root
+        x_new = (x_l*Res(x_r)-x_r*Res(x_l))/(Res(x_r)-Res(x_l))
+        if (Res(x_new)*Res(x_r)>0):
+            x_r = x_new
+        else:
+            x_l = x_new
+        err = abs(x_l-x_r)
 
-def Shock_Tube_Exact(x_min,x_max,N,P4,T4,P1,T1,time,mode='data'):
+        #limit total number of iterations
+        if (cntr == 100):
+            print('\n  **Iteration limit exceeded (e = %1.6e)\n' % err)
+            break
+    x_th = x_new
+    print('Location of the throat is x_th = %2.8f[m]' % x_th)
+   
+
+    #Compute the isentropic solution for the nozzle flow
+    print('Computing isentropic nozzle solution')
+    Mach_vec = np.zeros(F_vec.shape)
+    def Res(M,AR): return (2/(gam+1)*(1+0.5*(gam-1)*M**2))**((gam+1)/(2*(gam-1)))-M*AR
+    for i in range(X_vec.shape[0]):
+
+        #area ratio for current location
+        AR = (r_func.__call__(X_vec[i])/r_func.__call__(x_th))**2
+
+        #subsonic or supersonic target
+        if (X_vec[i]<=x_th):
+
+            #subsonic branch
+            M_l = 0.0; M_r = 1.0; cntr=0; err=1.0
+            while ((err>1e-12) and (cntr<=1500)):
+                cntr+=1; 
+                M_new = (M_l*Res(M_r,AR)-M_r*Res(M_l,AR))/(Res(M_r,AR)-Res(M_l,AR))
+                if (Res(M_new,AR)*Res(M_r,AR)>0):
+                    M_r = M_new
+                else:
+                    M_l = M_new
+                err = abs(Res(M_new,AR))
+
+        else:
+
+            #supersonic branch
+            M_l = 1.0; M_r = 5.0; cntr=0; err=1.0
+            while ((err>1e-12) and (cntr<=1500)):
+                cntr+=1; 
+                M_new = (M_l*Res(M_r,AR)-M_r*Res(M_l,AR))/(Res(M_r,AR)-Res(M_l,AR))
+                if (Res(M_new,AR)*Res(M_r,AR)>0):
+                    M_r = M_new
+                else:
+                    M_l = M_new
+                err = abs(Res(M_new,AR))
+    
+        #store the converged Mach number    
+        Mach_vec[i] = M_new
+
+    print('Finished. Max isentropic Mach number on the grid is M = %2.5f' % Mach_vec.max())
+
+    return F_vec,x_th,Mach_vec
+
+def Shock_Tube_Exact(X,P4,T4,P1,T1,time,mode='data'):
     '''
     ================================================================
                                                                     
@@ -461,18 +569,17 @@ def Shock_Tube_Exact(x_min,x_max,N,P4,T4,P1,T1,time,mode='data'):
         T4      = Driver temperature [K]
         P1      = Driven pressure [Pa]
         T1      = Driven temperature [K]
-        time    = Solution time [s]
-        demo    = Boolean flag for running in demo mode
+        time    = Solution time (vector or scalar) [s]
+        demo    = Flag for running the code in demo mode
                                                                     
     ================================================================
-    
     '''
-
     global f_num
 
     import matplotlib.pyplot as plt
     import numpy as np
     import sys, os
+    from time import sleep
 
     #define constants
     eps = np.finfo(float).eps
@@ -495,7 +602,8 @@ def Shock_Tube_Exact(x_min,x_max,N,P4,T4,P1,T1,time,mode='data'):
         #set domain limits
         x = np.linspace(-1.0,1.0,501)
         x0 = 0.0
-        t = 1e-3
+        t_vec = np.array([1e-3])
+
     else:
 
         #left and right state vectors
@@ -505,9 +613,12 @@ def Shock_Tube_Exact(x_min,x_max,N,P4,T4,P1,T1,time,mode='data'):
         q_R = np.array([rho_1, 0, P1/(gam-1)])
 
         #set domain limits
-        x = np.linspace(x_min,x_max,N)
-        x0 = (max(x)+min(x))/2
-        t = time
+        x0 = 0.0; x = X
+        #defensive programming
+        if np.isscalar(time):
+            t_vec = np.array([time])
+        else:
+            t_vec = np.array(time)
 
     #total number of points on the grid
     N = x.shape[0] 
@@ -516,12 +627,12 @@ def Shock_Tube_Exact(x_min,x_max,N,P4,T4,P1,T1,time,mode='data'):
     c_L = np.sqrt(gam*(gam-1)*q_L[2]/q_L[0])
     c_R = np.sqrt(gam*(gam-1)*q_R[2]/q_R[0])
 
-    #compute the shock Mach number Ms using Newton-Raphson + Complex-Step Derivative
+    #solve the shock-tube equation using Newton-Raphson + Complex-Step Derivative
     P_41 = q_L[2]/q_R[2]
     err = 1.0; cntr = 0; h=1e-30; M_sh = 1.5
     #print('P_41 = %d' % P_41)
     Res = lambda M_sh: -P_41*(1-(gam-1)/(gam+1)*(c_R/c_L)*(M_sh**2-1)/M_sh)**(2*gam/(gam-1))+2*gam/(gam+1)*(M_sh**2-1)+1
-    print('Solving for shock Mach number (M_sh) based on P_41=%3.1f:' % P_41)
+    print('Solving the shock tube equation for P_41=%3.1f:' % P_41)
     while (err>eps): 
         cntr += 1; Msh_p = M_sh
         M_sh -= h*Res(M_sh)/np.imag(Res(complex(M_sh,h)))
@@ -533,146 +644,139 @@ def Shock_Tube_Exact(x_min,x_max,N,P4,T4,P1,T1,time,mode='data'):
             print('\n  **Iteration limit exceeded (e = %1.6e)\n' % err)
             break
 
-    #compute shock velocity [m/s] and static pressure-jump P_21 = P2/P1
-    v_sh = M_sh*c_R
-    x_sh = x0 + v_sh*t
-    P_21 = 1.0+2*gam/(gam+1)*(M_sh**2-1)
-    #if len(sys.argv) == 0:
-    #print('\n  M_shock = %2.3f' % M_sh)
-    #print('\n  P_21 = %3.3f' % P_21)
-
-    #compute velocity of the contact discontinuity [m/s]
-    v_ct = 2*c_L/(gam-1)*(1-(P_21/P_41)**((gam-1)/(2*gam)))
-    x_ct = x0 + v_ct*t
-    u3 = v_ct; u2 = v_ct
-
-    #compute sound speeds in Regions 2 and 3
-    c2 = c_R*np.sqrt(P_21*(2+(gam-1)*M_sh**2)/((gam+1)*M_sh**2))
-    c3 = c_L*(P_21/P_41)**((gam-1)/(2*gam))
-    #print('\n  c2 = %3.3f' % c2)
-    #print('\n  c3 = %3.3f' % c3)
-
-    #compute velocity of left and right sides of the expansion fan
-    v_fL = -c_L
-    x_fL = x0 + v_fL*t
-    v_fR = u2-c3
-    x_fR = x0 + v_fR*t
-
-    #write out the solution
-    q_an = np.zeros((N,3))
+    #compute the exact solution for each time in t_vec
+    Nt = t_vec.shape[0]
     alpha  = (gam+1)/(gam-1)
-    for i in range(N):
+    Q_exact = np.zeros((N,3,Nt))
+    for k in range(Nt):
 
-        #undisturbed driven (right) state 
-        if (x[i]>x_sh):
-            rho = q_R[0]
-            u   = 0.0
-            p   = (gam-1)*q_R[2]
+        #current solution time
+        t = t_vec[k]
 
-        #undisturbed driver (left) state
-        elif (x[i]<x_fL):
-            rho = q_L[0]
-            u   = 0.0
-            p   = (gam-1)*q_L[2]
+        #compute shock velocity [m/s] and static pressure-jump P_21 = P2/P1
+        v_sh = M_sh*c_R
+        x_sh = x0 + v_sh*t
+        P_21 = 1.0+2*gam/(gam+1)*(M_sh**2-1)
 
-        #between the head of the expansion fan the the shock
-        else:
+        #compute velocity of the contact discontinuity [m/s]
+        v_ct = 2*c_L/(gam-1)*(1-(P_21/P_41)**((gam-1)/(2*gam)))
+        x_ct = x0 + v_ct*t
+        u3 = v_ct; u2 = v_ct
 
-            #define a locator variable
-            xi = (x[i]-x_fR)/(x_ct-x_fR)
-            
-            #x between shock and contact discontinuity
-            if (xi>1.0):
-                rho = ((1+alpha*P_21)/(alpha+P_21))*q_R[0]
-                u   = u2
-                p   = P_21*((gam-1)*q_R[2])
+        #compute sound speeds in Regions 2 and 3
+        c2 = c_R*np.sqrt(P_21*(2+(gam-1)*M_sh**2)/((gam+1)*M_sh**2))
+        c3 = c_L*(P_21/P_41)**((gam-1)/(2*gam))
 
-            #x within the expansion fan
-            elif (xi<0.0):
-                u   = 2/(gam+1)*(c_L+(x[i]-x0)/t)
-                p   = (gam-1)*q_L[2]*(1-(gam-1)*u/(2*c_L))**(2*gam/(gam-1))
-                rho = q_L[0]*(p/((gam-1)*q_L[2]))**(1/gam)
+        #compute velocity of left and right sides of the expansion fan
+        v_fL = -c_L
+        x_fL = x0 + v_fL*t
+        v_fR = u2-c3
+        x_fR = x0 + v_fR*t
 
-            #x between contact disconinuity and expansion fan
+        #write out the solution
+        for i in range(N):
+
+            #undisturbed driven (right) state 
+            if (x[i]>x_sh):
+                rho = q_R[0]
+                u   = 0.0
+                p   = (gam-1)*q_R[2]
+
+            #undisturbed driver (left) state
+            elif (x[i]<x_fL):
+                rho = q_L[0]
+                u   = 0.0
+                p   = (gam-1)*q_L[2]
+
+            #between the head of the expansion fan the the shock
             else:
-                rho = q_L[0]*(P_21/P_41)**(1/gam)
-                u   = u3
-                p   = P_21*((gam-1)*q_R[2])
 
-        #construct solution vector from the primitive variables
-        q_an[i,0] = rho
-        if (abs(t)>eps):
-            q_an[i,1] = rho*u
-        q_an[i,2] = p/(gam-1)+0.5*rho*u**2
+                #define a locator variable
+                xi = (x[i]-x_fR)/(x_ct-x_fR+eps)
+                
+                #x between shock and contact discontinuity
+                if (xi>1.0):
+                    rho = ((1+alpha*P_21)/(alpha+P_21))*q_R[0]
+                    u   = u2
+                    p   = P_21*((gam-1)*q_R[2])
 
+                #x within the expansion fan
+                elif (xi<0.0):
+                    u   = 2/(gam+1)*(c_L+(x[i]-x0)/t)
+                    p   = (gam-1)*q_L[2]*(1-(gam-1)*u/(2*c_L))**(2*gam/(gam-1))
+                    rho = q_L[0]*(p/((gam-1)*q_L[2]))**(1/gam)
 
-    #plot the solution if run without arguments 
-    if (mode == 'demo'):
+                #x between contact disconinuity and expansion fan
+                else:
+                    rho = q_L[0]*(P_21/P_41)**(1/gam)
+                    u   = u3
+                    p   = P_21*((gam-1)*q_R[2])
 
-        #compute the variables
-        P_plot = (gam-1)*(q_an[:,2]-q_an[:,1]**2/(2*q_an[:,0]))
-        U = q_an[:,1]/q_an[:,0]
-        Mach = np.sqrt(q_an[:,0]*U**2/(gam*P_plot))
-        T_plot = P_plot/(R*q_an[:,0])
-        c_plot = np.sqrt(gam*R*T_plot)
-        Entropy = P_plot/(q_an[:,0])**(gam)
-        e = q_an[:,2]/q_an[:,0]-0.5*U**2
-        t_plt = float(1e3*t)
+            #construct solution vector from the primitive variables
+            Q_exact[i,0,k] = rho
+            Q_exact[i,1,k] = rho*u
+            Q_exact[i,2,k] = p/(gam-1)+0.5*rho*u**2
 
-        #make the figures
-        fig = plt.figure(f_num)
-        ax1 = fig.add_subplot(221)
-        ax1.plot(x,q_an[:,0],'-b',linewidth=3.0)
-        ax1.set_title('Density (t=%1.3f[ms])' % t_plt)
-        ax1.set(xlabel=r'$x\;[m]$', ylabel=r'$\rho\;[kg/m^3]$')
-        ax2 = fig.add_subplot(222)
-        ax2.plot(x,(1e-3)*P_plot,'-b',linewidth=3.0)
-        ax2.set_title('Pressure (t=%1.3f[ms])' % t_plt)
-        ax2.set(xlabel=r'$x\;[m]$', ylabel=r'$p\;[kPa]$')
-        ax3 = fig.add_subplot(223)
-        ax3.plot(x,U,'-b',linewidth=3.0)
-        ax3.set_title('Velocity (t=%1.3f[ms])' % t_plt)
-        ax3.set(xlabel=r'$x\;[m]$', ylabel=r'$V\;[m/s]$')
-        ax4 = fig.add_subplot(224)
-        ax4.plot(x,Mach,'-b',linewidth=3.0)
-        ax4.set_title('Mach (t=%1.3f[ms])' % t_plt)
-        ax4.set(xlabel=r'$x\;[m]$', ylabel=r'$M$')
-        fig.tight_layout()
-        plt.savefig('fig_%d.pdf' % f_num)
-        f_num += 1
+        #plot the solution if run without arguments 
+        if (mode=='demo' or (mode=='testing' and k==(Nt-1))):
 
-        fig = plt.figure(f_num)
-        ax1 = fig.add_subplot(221)
-        ax1.plot(x,(1e-3)*e,'-b',linewidth=3.0)
-        ax1.set_title('Specific Energy (t=%1.3f[ms])' % t_plt)
-        ax1.set(xlabel=r'$x\;[m]$', ylabel=r'$e\;[kJ/kg]$')
-        ax2 = fig.add_subplot(222)
-        ax2.plot(x,c_plot,'-b',linewidth=3.0)
-        ax2.set_title('Speed of Sound (t=%1.3f[ms])' % t_plt)
-        ax2.set(xlabel=r'$x\;[m]$', ylabel=r'$c\;[m/s]$')
-        ax3 = fig.add_subplot(223)
-        ax3.plot(x,T_plot,'-b',linewidth=3.0)
-        ax3.set_title('Temperature (t=%1.3f[ms])' % t_plt)
-        ax3.set(xlabel=r'$x\;[m]$', ylabel=r'$T\;[K]$')
-        ax4 = fig.add_subplot(224)
-        ax4.plot(x,(1e-3)*Entropy,'-b',linewidth=3.0)
-        ax4.set_title('Entropy (t=%1.3f[ms])' % t_plt)
-        ax4.set(xlabel=r'$x\;[x]$', ylabel=r'$s\;[kJ/kgK]$')
-        fig.tight_layout()
-        plt.savefig('fig_%d.pdf' % f_num)
-        f_num += 1
+            #compute the variables
+            P_plot = (gam-1)*(Q_exact[:,2,k]-Q_exact[:,1,k]**2/(2*Q_exact[:,0,k]))
+            U = Q_exact[:,1,k]/Q_exact[:,0,k]
+            Mach = np.sqrt(Q_exact[:,0,k]*U**2/(gam*P_plot))
+            T_plot = P_plot/(R*Q_exact[:,0,k])
+            c_plot = np.sqrt(gam*R*T_plot)
+            Entropy = P_plot/(Q_exact[:,0,k])**(gam)
+            e = Q_exact[:,2,k]/Q_exact[:,0,k]-0.5*U**2
+            t_plt = float(1e3*t)
 
-        #show the plot(s)
-        plt.show()
-     
-    return q_an
+            #make the figures
+            fig = plt.figure(f_num)
+            ax1 = fig.add_subplot(221)
+            ax1.plot(x,Q_exact[:,0,k],'-b',linewidth=3.0)
+            ax1.set_title('Density (t=%1.3f[ms])' % t_plt)
+            ax1.set(xlabel=r'$x\;[m]$', ylabel=r'$\rho\;[kg/m^3]$')
+            ax2 = fig.add_subplot(222)
+            ax2.plot(x,(1e-3)*P_plot,'-b',linewidth=3.0)
+            ax2.set_title('Pressure (t=%1.3f[ms])' % t_plt)
+            ax2.set(xlabel=r'$x\;[m]$', ylabel=r'$p\;[kPa]$')
+            ax3 = fig.add_subplot(223)
+            ax3.plot(x,U,'-b',linewidth=3.0)
+            ax3.set_title('Velocity (t=%1.3f[ms])' % t_plt)
+            ax3.set(xlabel=r'$x\;[m]$', ylabel=r'$V\;[m/s]$')
+            ax4 = fig.add_subplot(224)
+            ax4.plot(x,Mach,'-b',linewidth=3.0)
+            ax4.set_title('Mach (t=%1.3f[ms])' % t_plt)
+            ax4.set(xlabel=r'$x\;[m]$', ylabel=r'$M$')
+            fig.tight_layout()
+            #plt.savefig('fig_%d.pdf' % f_num)
+            f_num += 1
 
+            fig = plt.figure(f_num)
+            ax1 = fig.add_subplot(221)
+            ax1.plot(x,(1e-3)*e,'-b',linewidth=3.0)
+            ax1.set_title('Specific Energy (t=%1.3f[ms])' % t_plt)
+            ax1.set(xlabel=r'$x\;[m]$', ylabel=r'$e\;[kJ/kg]$')
+            ax2 = fig.add_subplot(222)
+            ax2.plot(x,c_plot,'-b',linewidth=3.0)
+            ax2.set_title('Speed of Sound (t=%1.3f[ms])' % t_plt)
+            ax2.set(xlabel=r'$x\;[m]$', ylabel=r'$c\;[m/s]$')
+            ax3 = fig.add_subplot(223)
+            ax3.plot(x,T_plot,'-b',linewidth=3.0)
+            ax3.set_title('Temperature (t=%1.3f[ms])' % t_plt)
+            ax3.set(xlabel=r'$x\;[m]$', ylabel=r'$T\;[K]$')
+            ax4 = fig.add_subplot(224)
+            ax4.plot(x,(1e-3)*Entropy,'-b',linewidth=3.0)
+            ax4.set_title('Entropy (t=%1.3f[ms])' % t_plt)
+            ax4.set(xlabel=r'$x\;[x]$', ylabel=r'$s\;[kJ/kgK]$')
+            fig.tight_layout()
+            #plt.savefig('fig_%d.pdf' % f_num)
+            f_num += 1
 
-f_num = 1
-## Test wave speed function 
-#q,x = init_cond(-17.0,2.0,100,70e5,300,1e5,300)
-#ws = euler_1d_wavespeed(q)
-#print("ws_max = ", ws)
-#
-##test area ratio function
+            #show the plot(s)
+            plt.show()
+            plt.pause(3.0)
+    
+    print('Exact solution for 1D shock-tube has been generated.\n')
 
+    return Q_exact
