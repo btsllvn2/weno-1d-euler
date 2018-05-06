@@ -35,7 +35,7 @@ def init_cond(X_min,X_max,N,P4,T4,P1,T1,x_bnd=0.0):
         
         rho[i] = P[i]/(R*T[i])
         u[i] = 0.0
-        
+
     #define the initial condition vector
     q_init[:,0] = rho
     q_init[:,1] = rho*u
@@ -44,35 +44,6 @@ def init_cond(X_min,X_max,N,P4,T4,P1,T1,x_bnd=0.0):
     print('Intiial condition generated successfully.')
     
     return q_init, X, dx
-
-    
-def eval_dp(q):
-#q is an Nxnv matrix with N grid points and nv variables   
-
-    import numpy as np
-
-    #primitive variables
-    gam = 1.4
-    rho = q[:,0]
-    u = q[:,1]/q[:,0]
-    e = q[:,2]
-    p = (gam-1.0)*(e-0.5*rho*u**2) - 1e5
-
-    return p
-    
-def eval_du(q):
-#q is an Nxnv matrix with N grid points and nv variables   
-
-    import numpy as np
-
-    #primitive variables
-    gam = 1.4
-    rho = q[:,0]
-    u = q[:,1]/q[:,0]
-    e = q[:,2]
-    p = (gam-1.0)*(e-0.5*rho*u**2) - 1e5
-
-    return u
 
 def phys_flux(q):
 #q is an Nxnv matrix with N grid points and nv variables   
@@ -355,17 +326,10 @@ def left_b_qdot(q,h):
     earr = q[:,2]
     parr = (gam-1.0)*(earr-0.5*rhoarr*uarr**2)
     carr = np.sqrt(gam*parr/rhoarr) 
-    #print("q[0] = %2.6f \t %2.6f \t %2.6f \t %2.6f \t %2.6f" % (q[0,0],q[1,0],q[2,0],q[3,0],q[4,0]))
-    #print("q[1] = %2.6f \t %2.6f \t %2.6f \t %2.6f \t %2.6f" % (q[0,1],q[1,1],q[2,1],q[3,1],q[4,1]))
-    #print("q[2] = %2.6f \t %2.6f \t %2.6f \t %2.6f \t %2.6f" % (q[0,2],q[1,2],q[2,2],q[3,2],q[4,2]))
 
-    #print("rhoarr = %2.6f \t %2.6f \t %2.6f \t %2.6f \t %2.6f" % (rhoarr[0],rhoarr[1],rhoarr[2],rhoarr[3],rhoarr[4]))
-    #print("parr   = %2.6f \t %2.6f \t %2.6f \t %2.6f \t %2.6f" % (parr[0],  parr[1],  parr[2],  parr[3],  parr[4]))
-    #print("uarr   = %2.6f \t %2.6f \t %2.6f \t %2.6f \t %2.6f" % (uarr[0],  uarr[1],  uarr[2],  uarr[3],  uarr[4]))
     R = np.zeros((3,3))
     
     u = uarr[0]
-    #print("Velocity at the wall = %2.8f" % (u))
     rho = rhoarr[0]
     c = carr[0] 
     
@@ -382,11 +346,18 @@ def left_b_qdot(q,h):
     drhodx = (-25*rhoarr[0]+48*rhoarr[1]-36*rhoarr[2]+16*rhoarr[3]-3*rhoarr[4])/(12*h)
     dpdx =   (-25*parr[0]  +48*parr[1]  -36*parr[2]  +16*parr[3]  -3*parr[4]  )/(12*h)
     dudx =   (-25*uarr[0]  +48*uarr[1]  -36*uarr[2]  +16*uarr[3]  -3*uarr[4]  )/(12*h)
-    #print("drhodx = ",drhodx," dpdx = ",dpdx," dudx = ",dudx)
     
+    # Apply the NRBC
     f1 = 1
-    f2 = 0
-    f3 = 0
+    f2 = 1
+    f3 = 1
+
+    if(u-c > 0):
+        f1 = 0
+    if(u > 0):
+        f2 = 0
+    if(u+c > 0):
+        f3 = 0
     
     # Compute the wave amplitudes
     L1 =  f1*(c-u)*(-dpdx + c*rho*dudx)/(2*c**2)
@@ -434,15 +405,25 @@ def right_b_qdot(q,h):
     dudx =   (3*uarr[-5]  -16*uarr[-4]  +36*uarr[-3]  -48*uarr[-2]  +25*uarr[-1]  )/(12*h)
     
     # Apply the NRBC
-    f1 = 0
+    f1 = 1
     f2 = 1
     f3 = 1
+
+    if(u-c < 0):
+        f1 = 0
+    if(u < 0):
+        f2 = 0
+    if(u+c < 0):
+        f3 = 0
     
     # Compute the wave amplitudes
     L1 =  f1*(c-u)*(-dpdx + c*rho*dudx)/(2*c**2)
     L2 =  f2*u*( -dpdx/c**2 + drhodx )
     L3 =  f3*(c+u)*( dpdx + c*rho*dudx)/(2*c**2)
-    
+ 
+    # Apply the Wall BC
+    #L1 = L3
+
     # Transform back to conservative form
     qdot = -(R.dot(np.array([[L1],[L2],[L3]]))).T
 

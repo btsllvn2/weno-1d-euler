@@ -21,7 +21,7 @@ import sys,os
 #  Main options for running the code:
 #
 #========================================
-runQuasi1D = True      # Run with the Q1D rhs source term
+runQuasi1D = False      # Run with the Q1D rhs source term
 saveFrames = False      # Frames from solution are saved to disk
 noDisplay  = False      # All realtime plotting is supressed 
 plot_freq  = 1          # Frequency of making/saving plots
@@ -52,17 +52,16 @@ R = 286.9
 N = 200
 
 # Specify the overall domain size
-X_min,X_max = -0.10,0.60
+#X_min,X_max = -0.10,0.60 # Quasi 1d case
+X_min,X_max = 1.5,2.0 # 1d case
 
 #initial location of the discontinuity [m]
-x0 = 0.0
+#x0 = 0.0 # Quasi 1d case
+x0 = 1.8 # 1d case
 
 # Specifiy target CFL and total number of time steps
 CFL = 0.5
-Nt = 1000
-
-# Specify the Pressure and temperature values of the initial condition
-P1,P4,T1,T4 = 1e4,1e5,300,300
+Nt = 500
 
 # initial conditions for specific run mode
 if (runQuasi1D):
@@ -134,7 +133,7 @@ P_41 = int(P4/P1)
 #allocate arrays for updating the solution
 q = np.copy(q_init)
 Q = np.zeros((q.shape[0]-6,q.shape[1],Nt+1))            #<-stored history
-state_variable_of_interest = np.zeros((q.shape[0]-6,Nt+1)) 
+
 Q[:,:,0] = q_init[3:-3,:]
 q1,q2 = np.zeros(q.shape),np.zeros(q.shape)
 x_vec = X[3:-3]
@@ -190,7 +189,6 @@ for i in range(1,Nt+1):
 
     #update the stored history
     Q[:,:,i] = q[3:-3,:]
-    state_variable_of_interest[:,i] = eval_dp(q[3:-3,:])
 
     #compute and store the primitive variables
     rho_plt = q[3:-3,0]
@@ -255,14 +253,5 @@ var_lst = [RHO,P,TEMP,M,1e-6*E,ENTROPY]
 label_lst = [r'Density [kg/m^3]',r'Pressure [Pa]',r'Temperature [K]',r'Mach [-]',r'Specific Energy [MJ/kg]',r'Measure of Entropy']
 for i in range(len(var_lst)): make_XT_plot(var_lst[i],label_lst[i])
 
-# fig, ax = plt.subplots()
-# line, = ax.plot(X[3:N-3],Q[:,0,0], color='b', marker='o', linewidth=2)
-# plt.xlim(-2.0,2.0)
-
-# def animate(n):
-    # line.set_ydata(Q[:,0,n])
-    # return line,
-
-# ani = animation.FuncAnimation(fig, animate, np.arange(1, Nt),interval=20, blit=True)
 plt.show()  
 print('Program complete.\n')
