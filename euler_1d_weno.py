@@ -74,7 +74,6 @@ def eval_du(q):
 
     return u
 
-
 def phys_flux(q):
 #q is an Nxnv matrix with N grid points and nv variables   
 
@@ -110,7 +109,6 @@ def euler_1d_wavespeed(q):
     c = np.sqrt(gam*p/rho) 
 
     #define max wavespeed(s) on the grid for LF splitting
-    
     ws = np.zeros(q.shape[1])
     for j in range(q.shape[1]):
         ws[j] = la.norm(u+(j-1)*c,np.inf) 
@@ -141,16 +139,13 @@ def langrange_extrap(x_in,q_in,x_ext):
         q_ext += q_in[i,:]*l_i
 
     return q_ext
-   
+
 def update_ghost_pts(X,q):
 
     #assign the ghost cell values
     for i in range(3):
-        q[i,0] =  q[6-i,0]
-        q[i,1] = -q[6-i,1]
-        q[i,2] =  q[6-i,2]
-        if(i != 0):
-            q[-(3-i),:] = 1e7*(-1)**i
+        q[(2-i),:]  = (10*(i+1))**10
+        q[-(3-i),:] = (10*(i+1))**10
         
     return(q)
 
@@ -203,15 +198,12 @@ def char_numerical_flux(q):
 
         # Compute the i + 1/2 points flux
         for k in range(0, Nvar):
-            if(i == N_x_p_half-1):
-                f_char_i_p_half[i,k] = phi_weno5(f_char_p[k,:],1) + phi_weno5(f_char_m[k,::-1],-1)
-            else:
-                f_char_i_p_half[i,k] = phi_weno5(f_char_p[k,:],0) + phi_weno5(f_char_m[k,::-1],0)    
+            f_char_i_p_half[i,k] = phi_weno5(f_char_p[k,:]) + phi_weno5(f_char_m[k,::-1])    
     
     return f_char_i_p_half
 
 
-def phi_weno5(f_char_p_s,flg):
+def phi_weno5(f_char_p_s):
     '''
     Function which computes a 5th-order WENO reconstruction of the numerical
     flux at location x_{i+1/2}, works regardless of the sign of f'(u)
@@ -305,9 +297,11 @@ def spatial_rhs(f_char,q_cons,dx):
     # Compute the state vector at the x_{1+1/2} points
     q_i_p_half = (q_cons[2:q_cons.shape[0]-3,:] + q_cons[3:q_cons.shape[0]-2,:])*0.5
 
-    #compute the (conservative) flux at each point in the grid
+    # Initialize arrays
     N = f_char.shape[0]
     R = np.zeros((N,3,3))
+
+    # Compute the R matrix at every half point flux location
     for i in range(N):
 
         #approximate state at x_{i+1/2}
@@ -321,7 +315,7 @@ def spatial_rhs(f_char,q_cons,dx):
         p = (gam-1)*(e-0.5*rho*u**2)
         c = np.sqrt(gam*p/rho) 
 
-        #matrix of right eigenvectors of A (eigenvalues in order u-c, u, and u+c)
+        #matrix of right eigenvectors of A (eigenvalues in order u-c, u, and u+c)    
         R[i,0,:] = 1.0
         R[i,1,0] = u-c
         R[i,1,1] = u
@@ -330,8 +324,13 @@ def spatial_rhs(f_char,q_cons,dx):
         R[i,2,1] = 0.5*u**2
         R[i,2,2] = c**2/(gam-1.0)+0.5*u**2+u*c
 
-    rhs = np.zeros((N,f_char.shape[1]))
-    for i in range(N-1):   
+    # Initialize rhs
+    rhs = np.zeros((N-1,f_char.shape[1]))
+
+    # Compute qdot at wall boundary
+    rhs[0,:] = left_b_qdot(np.array(q_cons[3:8,:]),dx)
+    
+    for i in range(1,rhs.shape[0]-1):   
         
         # Local Right Eigen Matrices
         R_p_half = R[i+1,:,:]
@@ -341,12 +340,69 @@ def spatial_rhs(f_char,q_cons,dx):
         rhs[i,:] = (-1/dx)*( R_p_half.dot((f_char[i+1,:]).T) - R_m_half.dot((f_char[i,:]).T) ).T
 
     # Compute qdot at non-reflecting boundary
-    rhs[N-1,:] = non_reflecting_qdot(np.array(q_cons[-8:-3,:]),dx)
+    rhs[rhs.shape[0]-1,:] = right_b_qdot(np.array(q_cons[-8:-3,:]),dx)
     
     return rhs
     
-def non_reflecting_qdot(q,h):
+def left_b_qdot(q,h):
     
+    import numpy as np
+    
+    #primitive variables
+    gam = 1.4
+    rhoarr = q[:,0]
+    uarr = q[:,1]/q[:,0]
+    earr = q[:,2]
+    parr = (gam-1.0)*(earr-0.5*rhoarr*uarr**2)
+    carr = np.sqrt(gam*parr/rhoarr) 
+    #print("q[0] = %2.6f \t %2.6f \t %2.6f \t %2.6f \t %2.6f" % (q[0,0],q[1,0],q[2,0],q[3,0],q[4,0]))
+    #print("q[1] = %2.6f \t %2.6f \t %2.6f \t %2.6f \t %2.6f" % (q[0,1],q[1,1],q[2,1],q[3,1],q[4,1]))
+    #print("q[2] = %2.6f \t %2.6f \t %2.6f \t %2.6f \t %2.6f" % (q[0,2],q[1,2],q[2,2],q[3,2],q[4,2]))
+
+    #print("rhoarr = %2.6f \t %2.6f \t %2.6f \t %2.6f \t %2.6f" % (rhoarr[0],rhoarr[1],rhoarr[2],rhoarr[3],rhoarr[4]))
+    #print("parr   = %2.6f \t %2.6f \t %2.6f \t %2.6f \t %2.6f" % (parr[0],  parr[1],  parr[2],  parr[3],  parr[4]))
+    #print("uarr   = %2.6f \t %2.6f \t %2.6f \t %2.6f \t %2.6f" % (uarr[0],  uarr[1],  uarr[2],  uarr[3],  uarr[4]))
+    R = np.zeros((3,3))
+    
+    u = uarr[0]
+    #print("Velocity at the wall = %2.8f" % (u))
+    rho = rhoarr[0]
+    c = carr[0] 
+    
+    #matrix of right eigenvectors of A (eigenvalues in order u-c, u, and u+c)
+    R[0,:] = 1.0
+    R[1,0] = u-c
+    R[1,1] = u
+    R[1,2] = u+c
+    R[2,0] = c**2/(gam-1.0)+0.5*u**2-u*c
+    R[2,1] = 0.5*u**2
+    R[2,2] = c**2/(gam-1.0)+0.5*u**2+u*c    
+    
+    # Compute spatial gradients
+    drhodx = (-25*rhoarr[0]+48*rhoarr[1]-36*rhoarr[2]+16*rhoarr[3]-3*rhoarr[4])/(12*h)
+    dpdx =   (-25*parr[0]  +48*parr[1]  -36*parr[2]  +16*parr[3]  -3*parr[4]  )/(12*h)
+    dudx =   (-25*uarr[0]  +48*uarr[1]  -36*uarr[2]  +16*uarr[3]  -3*uarr[4]  )/(12*h)
+    #print("drhodx = ",drhodx," dpdx = ",dpdx," dudx = ",dudx)
+    
+    f1 = 1
+    f2 = 0
+    f3 = 0
+    
+    # Compute the wave amplitudes
+    L1 =  f1*(c-u)*(-dpdx + c*rho*dudx)/(2*c**2)
+    L2 =  f2*u*( -dpdx/c**2 + drhodx )
+    L3 =  f3*(c+u)*( dpdx + c*rho*dudx)/(2*c**2)
+    
+    # Apply the Wall BC
+    #L3 = L1
+
+    # Transform back to conservative form
+    qdot = -(R.dot(np.array([[L1],[L2],[L3]]))).T
+    return qdot
+    
+def right_b_qdot(q,h):
+    
+    import scipy.interpolate as interp
     import numpy as np
     
     #primitive variables
@@ -373,20 +429,23 @@ def non_reflecting_qdot(q,h):
     R[2,2] = c**2/(gam-1.0)+0.5*u**2+u*c    
     
     # Compute spatial gradients
-    drho_dx = (3*rhoarr[-5]-16*rhoarr[-4]+36*rhoarr[-3]-48*rhoarr[-2]+25*rhoarr[-1])/(12*1.0*h**1)
-    du_dx = (3*uarr[-5]-16*uarr[-4]+36*uarr[-3]-48*uarr[-2]+25*uarr[-1])/(12*1.0*h**1)
+    drhodx = (3*rhoarr[-5]-16*rhoarr[-4]+36*rhoarr[-3]-48*rhoarr[-2]+25*rhoarr[-1])/(12*h)
+    dpdx =   (3*parr[-5]  -16*parr[-4]  +36*parr[-3]  -48*parr[-2]  +25*parr[-1]  )/(12*h)
+    dudx =   (3*uarr[-5]  -16*uarr[-4]  +36*uarr[-3]  -48*uarr[-2]  +25*uarr[-1]  )/(12*h)
     
+    # Apply the NRBC
     f1 = 0
     f2 = 1
     f3 = 1
     
     # Compute the wave amplitudes
-    L1 = -f1*(c-u)*(c*drho_dx - gam*rho*du_dx)/(2*c*gam)
-    L2 =  f2*(-1+gam)*u*drho_dx/gam
-    L3 =  f3*(c+u)*(c*drho_dx + gam*rho*du_dx)/(2*c*gam)
+    L1 =  f1*(c-u)*(-dpdx + c*rho*dudx)/(2*c**2)
+    L2 =  f2*u*( -dpdx/c**2 + drhodx )
+    L3 =  f3*(c+u)*( dpdx + c*rho*dudx)/(2*c**2)
     
+    # Transform back to conservative form
     qdot = -(R.dot(np.array([[L1],[L2],[L3]]))).T
-    
+
     return qdot
 
 #source term which accounts for quasi-1D area variation
@@ -552,7 +611,7 @@ def areaFunc(x,r,X_vec,makePlot=False,demo=False):
 
     return F_vec,x_th,Mach_vec
 
-def Shock_Tube_Exact(X,P4,T4,P1,T1,time,mode='data'):
+def Shock_Tube_Exact(X,P4,T4,P1,T1,time,x0=0.0,mode='data'):
     '''
     ================================================================
                                                                     
@@ -613,7 +672,7 @@ def Shock_Tube_Exact(X,P4,T4,P1,T1,time,mode='data'):
         q_R = np.array([rho_1, 0, P1/(gam-1)])
 
         #set domain limits
-        x0 = 0.0; x = X
+        x = X
         #defensive programming
         if np.isscalar(time):
             t_vec = np.array([time])
