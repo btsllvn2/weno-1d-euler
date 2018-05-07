@@ -21,13 +21,12 @@ import sys,os
 #  Main options for running the code:
 #
 #========================================
-runQuasi1D = False      # Run with the Q1D rhs source term
+runQuasi1D = True       # Run with the Q1D rhs source term
 saveFrames = False      # Frames from solution are saved to disk
-noDisplay  = False      # All realtime plotting is supressed 
 plot_freq  = 1          # Frequency of making/saving plots
 
-#supress display output
-if (noDisplay):
+#supress the display output
+if (saveFrames):
     import matplotlib
     matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -39,8 +38,8 @@ if not os.path.exists('frames'):
     os.makedirs('frames')
 
 #use LaTeX formatting for titles and axes
-#plt.rc('text', usetex=True)
-#plt.rc('font', family='serif')
+plt.rc('text', usetex=True)
+plt.rc('font', family='serif')
 plt.rcParams['figure.figsize'] = (10.0,5.625)
 
 os.system('clear')
@@ -52,33 +51,29 @@ R = 286.9
 N = 200
 
 # Specify the overall domain size
-#X_min,X_max = -0.10,0.60 # Quasi 1d case
-X_min,X_max = 1.5,2.0 # 1d case
+X_min,X_max = -0.10,0.60
 
 #initial location of the discontinuity [m]
-#x0 = 0.0 # Quasi 1d case
-x0 = 1.8 # 1d case
+x0 = 0.0
 
 # Specifiy target CFL and total number of time steps
 CFL = 0.5
-Nt = 500
+Nt = 1000
+
+# Specify the Pressure and temperature values of the initial condition
+P1,P4,T1,T4 = 1e4,1e5,300,300
 
 # initial conditions for specific run mode
 if (runQuasi1D):
 
     #set the initial condition
     rho4 = 1.0
-    P4 = 1e5
+    P4 = 1e6
     T4 = P4/(R*rho4)
     rho1 = 0.125
     P1 = 1e4
     T1 = P1/(R*rho1)
     q_init,X,dx = init_cond(X_min,X_max,N,P4,T4,P1,T1)
-
-    #compute a stable timestep
-    u_max = np.sqrt(2*gam*R*max(T4,T1)/(gam-1))
-    dt = CFL*dx/u_max
-    T_final = Nt*dt
 
     #define the shock-tube and nozzle geometry
     Geom_Dat = np.array([[-17.00000,  0.0568613],
@@ -102,6 +97,7 @@ if (runQuasi1D):
 else:
 
     #set the initial condition
+    x0 = 0.0
     rho4 = 1.0
     P4 = 1e5
     T4 = P4/(R*rho4)
@@ -110,40 +106,22 @@ else:
     T1 = P1/(R*rho1)
     q_init,X,dx = init_cond(X_min,X_max,N,P4,T4,P1,T1,x0)
 
-    #compute a stable timestep
-    u_max = np.sqrt(2*gam*R*max(T4,T1)/(gam-1))
-    dt = CFL*dx/u_max
-    T_final = Nt*dt 
-
-    #compute the exact solution for the 1D shock-tube problem
-    t_exact = np.linspace(0,T_final,Nt+1)
-    Q_exact = Shock_Tube_Exact(X,P4,T4,P1,T1,t_exact,x0)
-    rho_ex = Q_exact[3:-3,0,:]
-    u_ex = Q_exact[3:-3,1,:]/rho_ex
-    e_ex = Q_exact[3:-3,2,:]
-    p_ex = (gam-1.0)*(e_ex-0.5*rho_ex*u_ex**2)
-    M_ex = np.sqrt(rho_ex*u_ex**2/(gam*p_ex))
-
-    #force the Q1D source term to be identically zero
+    #force Q1D source term to be identically zero
     F_vec = np.zeros(X[3:-3].shape)
 
-print('Maximum possible velocity on domain: u_max = %4.3f [m/s]' % u_max)
-P_41 = int(P4/P1)
 
 #allocate arrays for updating the solution
 q = np.copy(q_init)
 Q = np.zeros((q.shape[0]-6,q.shape[1],Nt+1))            #<-stored history
-
+state_variable_of_interest = np.zeros((q.shape[0]-6,Nt+1)) 
 Q[:,:,0] = q_init[3:-3,:]
 q1,q2 = np.zeros(q.shape),np.zeros(q.shape)
-x_vec = X[3:-3]
-t_vec = np.linspace(0.0,Nt*dt,Nt+1)
-
 rho_plt = q[3:-3,0]
 u_plt = q[3:-3,1]/rho_plt
 e_plt = q[3:-3,2]
 p_plt = (gam-1.0)*(e_plt-0.5*rho_plt*u_plt**2)
 M_plt = np.sqrt(rho_plt*u_plt**2/(gam*p_plt))
+P_41 = int(P4/P1)
 
 #real-time animation  
 plt.ion()
@@ -156,7 +134,8 @@ if(runQuasi1D):
     plt.ylabel('Mach',fontsize=15)
     plt.ylim(0,5.0)
 else:
-    line1, = plt.plot(X[3:N-3],Q_exact[3:N-3,0,0],'-k',linewidth=1.0,label='Exact Solution')
+    Q_exact,M_sh = Shock_Tube_Exact(X,P4,T4,P1,T1,0.0,x0,1.0)
+    line1, = plt.plot(X[3:N-3],Q_exact[3:-3,0],'-k',linewidth=1.0,label='Exact Solution')
     line2, = plt.plot(X[3:N-3],q_init[3:N-3,0],'ob',label='WENO-JS')
     plt.title("Sod's Shock Tube Problem ($P_{41}$=%d, t=%2.3f[ms])" % (P_41,0.0),fontsize=15)
     plt.ylabel('Density',fontsize=15)
@@ -168,11 +147,17 @@ plt.savefig('frames/frame%08d.png' % 0)
 plt.pause(eps)
 
 #perform time integration
+t_vec = np.zeros(Nt+1)
 print('\nStarting time integration...')
 for i in range(1,Nt+1):
 
+    #define CFL-stable timestep and update time history
+    ws_max = np.max(euler_1d_wavespeed(q))
+    dt = CFL*dx/ws_max
+    t_vec[i] = t_vec[i-1] + 1e3*dt
+
     #display to terminal
-    print('n = %d,    t = %2.5f[ms]' % (i,float(1000*i*dt)))
+    print('n = %d,  CFL = %1.2f,  dt = %3.4f[ms],  t = %2.5f[ms]' % (i,CFL,1e3*dt,t_vec[i]))
     
     # Third-order TVD Scheme (Shu '01)
     q = update_ghost_pts(X,q)
@@ -197,15 +182,22 @@ for i in range(1,Nt+1):
     p_plt = (gam-1.0)*(e_plt-0.5*rho_plt*u_plt**2)
     M_plt = np.sqrt(rho_plt*u_plt**2/(gam*p_plt))
 
-    #real-time animation   
+    #real-time animation 
     if(i%plot_freq==0):
         if(runQuasi1D): 
-            plt.title('Solution to GALCIT Nozzle Flow Using WENO-JS ($P_{41}$=%d, t=%2.3f[ms])' % (P_41,float(1000*i*dt)),fontsize=15)
+            plt.title('Solution to GALCIT Nozzle Flow Using WENO-JS ($P_{41}$=%d, t=%2.3f[ms])' % (P_41,t_vec[i]),fontsize=15)
             line2.set_ydata(M_plt)
         else:
-            line1.set_ydata(Q_exact[3:N-3,0,i])
+            #compute the exact solution for the 1D shock-tube problem
+            Q_exact,M_sh = Shock_Tube_Exact(X,P4,T4,P1,T1,1e-3*t_vec[i],x0,M_sh)
+            rho_ex = Q_exact[3:-3,0]
+            u_ex = Q_exact[3:-3,1]/rho_ex
+            e_ex = Q_exact[3:-3,2]
+            p_ex = (gam-1.0)*(e_ex-0.5*rho_ex*u_ex**2)
+            M_ex = np.sqrt(rho_ex*u_ex**2/(gam*p_ex))
+            line1.set_ydata(rho_ex)
             line2.set_ydata(q[3:N-3,0])
-            plt.title("Sod's Shock Tube Problem ($P_{41}$=%d, t=%2.3f[ms])" % (P_41,float(1000*i*dt)),fontsize=15)
+            plt.title("Sod's Shock Tube Problem ($P_{41}$=%d, t=%2.3f[ms])" % (P_41,t_vec[i]),fontsize=15)
         if (saveFrames): plt.savefig('frames/frame%08d.png' % int(i/plot_freq))
         plt.pause(eps)
 
@@ -224,7 +216,8 @@ TEMP = P/(R*RHO)
 f_num = 3
 
 #generate XT-plots
-X,T = np.meshgrid(x_vec,1e3*t_vec)
+x_vec = X[3:-3]
+X,T = np.meshgrid(x_vec,t_vec)
 def make_XT_plot(var,v_label):
 
     #used outside the function
@@ -249,8 +242,8 @@ def make_XT_plot(var,v_label):
     return
 
 #make an xt-plot for each variable
-var_lst = [RHO,P,TEMP,M,1e-6*E,ENTROPY]
-label_lst = [r'Density [kg/m^3]',r'Pressure [Pa]',r'Temperature [K]',r'Mach [-]',r'Specific Energy [MJ/kg]',r'Measure of Entropy']
+var_lst = [RHO,P,TEMP,M,U,1e-6*E,ENTROPY]
+label_lst = [r'Density [kg/m^3]',r'Pressure [Pa]',r'Temperature [K]',r'Mach [-]',r'Velocity [m/s]',r'Specific Energy [MJ/kg]',r'Measure of Entropy']
 for i in range(len(var_lst)): make_XT_plot(var_lst[i],label_lst[i])
 
 plt.show()  

@@ -32,7 +32,6 @@ def init_cond(X_min,X_max,N,P4,T4,P1,T1,x_bnd=0.0):
         else:
                 P[i] = P1
                 T[i] = T1
-        
         rho[i] = P[i]/(R*T[i])
         u[i] = 0.0
 
@@ -592,7 +591,7 @@ def areaFunc(x,r,X_vec,makePlot=False,demo=False):
 
     return F_vec,x_th,Mach_vec
 
-def Shock_Tube_Exact(X,P4,T4,P1,T1,time,x0=0.0,mode='data'):
+def Shock_Tube_Exact(X,P4,T4,P1,T1,time,x0=0.0,M_sh=1.0,mode='data'):
     '''
     ================================================================
                                                                     
@@ -626,11 +625,6 @@ def Shock_Tube_Exact(X,P4,T4,P1,T1,time,x0=0.0,mode='data'):
     pi = 4.0*np.arctan(1.0)
     gam = 1.4
     R = 286.9
-
-    #use LaTeX formatting for titles and axes
-    #plt.rc('text', usetex=True)
-    #plt.rc('font', family='serif')
-    plt.rcParams['figure.figsize'] = (10.0,6.0)
 
     #set the run parameters
     if (mode == 'demo'):
@@ -669,25 +663,27 @@ def Shock_Tube_Exact(X,P4,T4,P1,T1,time,x0=0.0,mode='data'):
 
     #solve the shock-tube equation using Newton-Raphson + Complex-Step Derivative
     P_41 = q_L[2]/q_R[2]
-    err = 1.0; cntr = 0; h=1e-30; M_sh = 1.5
-    #print('P_41 = %d' % P_41)
-    Res = lambda M_sh: -P_41*(1-(gam-1)/(gam+1)*(c_R/c_L)*(M_sh**2-1)/M_sh)**(2*gam/(gam-1))+2*gam/(gam+1)*(M_sh**2-1)+1
-    print('Solving the shock tube equation for P_41=%3.1f:' % P_41)
-    while (err>eps): 
-        cntr += 1; Msh_p = M_sh
-        M_sh -= h*Res(M_sh)/np.imag(Res(complex(M_sh,h)))
-        err = abs(M_sh/Msh_p-1)
-        print('    N = %d, e = %1.6e' % (cntr,err))
+    if ((t_vec.shape[0]>1)or(np.isscalar(time) and abs(time)<eps)):
+        err = 1.0; cntr = 0; h=1e-30; M_sh = 1.5
+        print('P_41 = %d' % P_41)
+        Res = lambda M_sh: -P_41*(1-(gam-1)/(gam+1)*(c_R/c_L)*(M_sh**2-1)/M_sh)**(2*gam/(gam-1))+2*gam/(gam+1)*(M_sh**2-1)+1
+        print('Solving the shock tube equation for P_41=%3.1f:' % P_41)
+        while (err>eps): 
+            cntr += 1; Msh_p = M_sh
+            M_sh -= h*Res(M_sh)/np.imag(Res(complex(M_sh,h)))
+            err = abs(M_sh/Msh_p-1)
+            print('    N = %d, e = %1.6e' % (cntr,err))
 
-        #limit total number of iterations
-        if (cntr == 15):
-            print('\n  **Iteration limit exceeded (e = %1.6e)\n' % err)
-            break
+            #limit total number of iterations
+            if (cntr==15):
+                print('\n  **Iteration limit exceeded (e = %1.6e)\n' % err)
+                break
 
     #compute the exact solution for each time in t_vec
     Nt = t_vec.shape[0]
     alpha  = (gam+1)/(gam-1)
     Q_exact = np.zeros((N,3,Nt))
+    print('M_sh inside function: ',M_sh)
     for k in range(Nt):
 
         #current solution time
@@ -816,7 +812,12 @@ def Shock_Tube_Exact(X,P4,T4,P1,T1,time,x0=0.0,mode='data'):
             #show the plot(s)
             plt.show()
             plt.pause(3.0)
-    
-    print('Exact solution for 1D shock-tube has been generated.\n')
 
-    return Q_exact
+    #shrink data to R^2 if time input is a scalar
+    if np.isscalar(time):
+        Q_exact = Q_exact[:,:,0]
+ 
+    if ((t_vec.shape[0]>1)or(np.isscalar(time) and abs(time)<eps)):
+        print('Exact solution for 1D shock-tube has been generated.\n')
+
+    return Q_exact,M_sh
