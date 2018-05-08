@@ -1,31 +1,53 @@
-# This code uses the various functions defined in euler_1d_weno.py to compute the RHS
-# Then it time steps it using TVD
-
-#============================
+#======================================================================
+#
+#   A Python code which utilizes the various functions supplied in
+#   "euler_1d_weno.py" to numerically solve the unsteady, Quasi-1D
+#   Euler equations using a finite-difference formulation of the 5th-
+#   order WENO scheme of Jiang and Shu '96. Boundary conditions are 
+#   of the characteristic type by Thompson '90. Time-stepping is the
+#   third-order TVD Runge-Kutta scheme suggested by Shu '97.
+#
 #   Terminology:
-#  --------------
-#   q       -> Physical state variables
-#   f       -> Physical flux terms
-#   q_char  -> Charateristic form of the state variables
-#   f_char  -> Charateristic form of the flux terms
-#============================
+#   q       = Physical state variables
+#   f       = Physical flux terms
+#   q_char  = Charateristic form of the state variables
+#   f_char  = Charateristic form of the flux terms
+#
+#======================================================================
 
 # Import the libraries that you need
 from euler_1d_weno import *
-import numpy as np
 import scipy.linalg as la 
+import numpy as np
 import sys,os
 
-#========================================
+#============================================================
 #
-#  Main options for running the code:
+#   Options for running the code:
+#   
+#   runQuasi1D = Run with the Q1D rhs source term enabled
+#   saveFrames = Frames from solution are saved to disk
+#   fixedCFL   = Run the code with a constant fixed CFL value
+#   plot_freq  = Frequency of making/saving plots
 #
-#========================================
-runQuasi1D = True       # Run with the Q1D rhs source term
-saveFrames = False      # Frames from solution are saved to disk
-plot_freq  = 1          # Frequency of making/saving plots
+#============================================================
+runQuasi1D = False
+saveFrames = False
+fixedCFL   = True
+plot_freq  = 1
 
-#supress the display output
+#============================================================
+#
+#   Set the left and right boundary conditions:
+# 
+#   left_bc  = ['Non-Reflecting','Wall','Zero-Gradient','other']
+#   right_bc = ['Non-Reflecting','Wall','Zero-Gradient','other']
+#
+#============================================================
+left_bc  = 'Non-Reflecting'
+right_bc = 'Non-Reflecting'
+
+#supress the display output so code runs faster
 if (saveFrames):
     import matplotlib
     matplotlib.use('Agg')
@@ -41,30 +63,36 @@ if not os.path.exists('frames'):
 plt.rc('text', usetex=True)
 plt.rc('font', family='serif')
 plt.rcParams['figure.figsize'] = (10.0,5.625)
-
 os.system('clear')
 eps = np.finfo('float').eps
+
+#global constants
 gam = 1.4
 R = 286.9
 
 # Specify the number of points in the domain (includes ghost points)
-N = 200
+N = 100
 
-# Specify the overall domain size
-X_min,X_max = -0.10,0.60
-
-#initial location of the discontinuity [m]
-x0 = 0.0
-
-# Specifiy target CFL and total number of time steps
+# Specifiy target CFL and total number of steps
 CFL = 0.5
-Nt = 1000
+Nt = 400
+
+# Assign fixed, user-specified dt if not in CFL mode
+if(not fixedCFL):
+    dt = input('What fixed timestep dt should be used? (s) ')
+    print('Using a fixed timestep of dt = %1.6e seconds.' % dt)
 
 # Specify the Pressure and temperature values of the initial condition
 P1,P4,T1,T4 = 1e4,1e5,300,300
 
 # initial conditions for specific run mode
 if (runQuasi1D):
+
+    # Specify the overall domain size
+    X_min,X_max = -0.10,0.60
+
+    #initial location of the discontinuity [m]
+    x0 = 0.0
 
     #set the initial condition
     rho4 = 1.0
@@ -73,7 +101,7 @@ if (runQuasi1D):
     rho1 = 0.125
     P1 = 1e4
     T1 = P1/(R*rho1)
-    q_init,X,dx = init_cond(X_min,X_max,N,P4,T4,P1,T1)
+    q_init,X,dx = init_cond(X_min,X_max,N,P4,T4,P1,T1,x0)
 
     #define the shock-tube and nozzle geometry
     Geom_Dat = np.array([[-17.00000,  0.0568613],
@@ -96,8 +124,11 @@ if (runQuasi1D):
     
 else:
 
-    #set the initial condition
+    # Specify the overall domain size
+    X_min,X_max = -0.10,0.10
     x0 = 0.0
+
+    #set the initial condition
     rho4 = 1.0
     P4 = 1e5
     T4 = P4/(R*rho4)
@@ -110,9 +141,9 @@ else:
     F_vec = np.zeros(X[3:-3].shape)
 
 
-#allocate arrays for updating the solution
+#allocate arrays for computing and storing the solution
 q = np.copy(q_init)
-Q = np.zeros((q.shape[0]-6,q.shape[1],Nt+1))            #<-stored history
+Q = np.zeros((q.shape[0]-6,q.shape[1],Nt+1))
 state_variable_of_interest = np.zeros((q.shape[0]-6,Nt+1)) 
 Q[:,:,0] = q_init[3:-3,:]
 q1,q2 = np.zeros(q.shape),np.zeros(q.shape)
@@ -123,10 +154,11 @@ p_plt = (gam-1.0)*(e_plt-0.5*rho_plt*u_plt**2)
 M_plt = np.sqrt(rho_plt*u_plt**2/(gam*p_plt))
 P_41 = int(P4/P1)
 
-#real-time animation  
+#initialize frame for real-time animation  
 plt.ion()
 plt.figure()
 if(runQuasi1D):
+    print('Shock tube operating pressure ratio P_41 = %d' % P_41)
     plt.title('Solution to GALCIT Nozzle Flow Using WENO-JS ($P_{41}$=%d, t=%2.3f[ms])' %(P_41,0.0),fontsize=15)
     line1, = plt.plot(X[3:N-3],Mach_vec,'--k',label='Isentropic Solution',linewidth=1.0)
     line2, = plt.plot(X[3:N-3],M_plt,'-b',label='WENO-JS',linewidth=3.0)
@@ -146,31 +178,36 @@ plt.draw()
 plt.savefig('frames/frame%08d.png' % 0)
 plt.pause(eps)
 
-#perform time integration
+#perform the time integration
 t_vec = np.zeros(Nt+1)
-print('\nStarting time integration...')
+print('\nPerforming time integration of %d total steps...' % Nt)
 for i in range(1,Nt+1):
 
-    #define CFL-stable timestep and update time history
-    ws_max = np.max(euler_1d_wavespeed(q))
-    dt = CFL*dx/ws_max
-    t_vec[i] = t_vec[i-1] + 1e3*dt
+    #set timestep based on target CFL
+    if(fixedCFL):
+        ws_max = np.max(euler_1d_wavespeed(q))
+        dt = CFL*dx/ws_max
+
+    #update the time history
+    t_vec[i] = t_vec[i-1] + dt
 
     #display to terminal
-    print('n = %d,  CFL = %1.2f,  dt = %3.4f[ms],  t = %2.5f[ms]' % (i,CFL,1e3*dt,t_vec[i]))
+    print('n = %d,  CFL = %1.2f,  dt = %1.2e[s],  t = %1.2e[s]' % (i,CFL,dt,t_vec[i]))
     
-    # Third-order TVD Scheme (Shu '01)
+    # Third-order TVD RK Scheme (Shu '97)
+    #======================================
     q = update_ghost_pts(X,q)
-    L0 = spatial_rhs(char_numerical_flux(q),q,dx) + q1d_rhs(F_vec,q[3:-3,:])
+    L0 = spatial_rhs(char_numerical_flux(q),q,dx,left_bc,right_bc) + q1d_rhs(F_vec,q[3:-3,:])
     q1[3:-3,:] = q[3:-3,:] + L0*dt
     
     q1 = update_ghost_pts(X,q1)
-    L1 = spatial_rhs(char_numerical_flux(q1),q1,dx) + q1d_rhs(F_vec,q1[3:-3,:])
+    L1 = spatial_rhs(char_numerical_flux(q1),q1,dx,left_bc,right_bc) + q1d_rhs(F_vec,q1[3:-3,:])
     q2[3:-3,:] = (3/4)*q[3:-3,:] + (1/4)*q1[3:-3,:] + (1/4)*L1*dt
     
     q2 = update_ghost_pts(X,q2)
-    L2 = spatial_rhs(char_numerical_flux(q2),q2,dx) + q1d_rhs(F_vec,q2[3:-3,:])
+    L2 = spatial_rhs(char_numerical_flux(q2),q2,dx,left_bc,right_bc) + q1d_rhs(F_vec,q2[3:-3,:])
     q[3:-3,:] = (1/3)*q[3:-3,:] + (2/3)*q2[3:-3,:]  + (2/3)*L2*dt    
+    #======================================
 
     #update the stored history
     Q[:,:,i] = q[3:-3,:]
@@ -185,11 +222,11 @@ for i in range(1,Nt+1):
     #real-time animation 
     if(i%plot_freq==0):
         if(runQuasi1D): 
-            plt.title('Solution to GALCIT Nozzle Flow Using WENO-JS ($P_{41}$=%d, t=%2.3f[ms])' % (P_41,t_vec[i]),fontsize=15)
+            plt.title('Solution to GALCIT Nozzle Flow Using WENO-JS ($P_{41}$=%d, t=%2.3f[ms])' % (P_41,1e3*t_vec[i]),fontsize=15)
             line2.set_ydata(M_plt)
         else:
             #compute the exact solution for the 1D shock-tube problem
-            Q_exact,M_sh = Shock_Tube_Exact(X,P4,T4,P1,T1,1e-3*t_vec[i],x0,M_sh)
+            Q_exact,M_sh = Shock_Tube_Exact(X,P4,T4,P1,T1,t_vec[i],x0,M_sh)
             rho_ex = Q_exact[3:-3,0]
             u_ex = Q_exact[3:-3,1]/rho_ex
             e_ex = Q_exact[3:-3,2]
@@ -197,7 +234,7 @@ for i in range(1,Nt+1):
             M_ex = np.sqrt(rho_ex*u_ex**2/(gam*p_ex))
             line1.set_ydata(rho_ex)
             line2.set_ydata(q[3:N-3,0])
-            plt.title("Sod's Shock Tube Problem ($P_{41}$=%d, t=%2.3f[ms])" % (P_41,t_vec[i]),fontsize=15)
+            plt.title("Sod's Shock Tube Problem ($P_{41}$=%d, t=%2.3f[ms])" % (P_41,1e3*t_vec[i]),fontsize=15)
         if (saveFrames): plt.savefig('frames/frame%08d.png' % int(i/plot_freq))
         plt.pause(eps)
 
@@ -217,7 +254,7 @@ f_num = 3
 
 #generate XT-plots
 x_vec = X[3:-3]
-X,T = np.meshgrid(x_vec,t_vec)
+X,T = np.meshgrid(x_vec,1e3*t_vec)
 def make_XT_plot(var,v_label):
 
     #used outside the function

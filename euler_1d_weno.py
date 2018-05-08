@@ -1,5 +1,5 @@
 # N is all the points including ghosts
-def init_cond(X_min,X_max,N,P4,T4,P1,T1,x_bnd=0.0):
+def init_cond(X_min,X_max,N,P4,T4,P1,T1,x0=0.0):
 #compute the initial condition on the grid for Reimann problem
 #coordinate system centered at fluid interface (default is x=0, otherwise x=x_bnd)
 
@@ -26,7 +26,7 @@ def init_cond(X_min,X_max,N,P4,T4,P1,T1,x_bnd=0.0):
 
     #initialize primative variables
     for i in range(N):
-        if(X[i]<=x_bnd):
+        if(X[i]<=x0):
                 P[i] = P4
                 T[i] = T4
         else:
@@ -255,7 +255,7 @@ def proj_to_char(q,f,q_st):
 
     return q_char,f_char
 
-def spatial_rhs(f_char,q_cons,dx):
+def spatial_rhs(f_char,q_cons,dx,left_bc,right_bc):
 
     '''
     f_char is a Ni x nv matrix of the characteristic flux only at interior adjacent flux interfaces
@@ -298,7 +298,7 @@ def spatial_rhs(f_char,q_cons,dx):
     rhs = np.zeros((N-1,f_char.shape[1]))
 
     # Compute qdot at wall boundary
-    rhs[0,:] = left_b_qdot(np.array(q_cons[3:8,:]),dx)
+    rhs[0,:] = left_b_qdot(np.array(q_cons[3:8,:]),dx,left_bc)
     
     for i in range(1,rhs.shape[0]-1):   
         
@@ -310,11 +310,11 @@ def spatial_rhs(f_char,q_cons,dx):
         rhs[i,:] = (-1/dx)*( R_p_half.dot((f_char[i+1,:]).T) - R_m_half.dot((f_char[i,:]).T) ).T
 
     # Compute qdot at non-reflecting boundary
-    rhs[rhs.shape[0]-1,:] = right_b_qdot(np.array(q_cons[-8:-3,:]),dx)
+    rhs[rhs.shape[0]-1,:] = right_b_qdot(np.array(q_cons[-8:-3,:]),dx,right_bc)
     
     return rhs
     
-def left_b_qdot(q,h):
+def left_b_qdot(q,h,bc_type):
     
     import numpy as np
     
@@ -364,13 +364,14 @@ def left_b_qdot(q,h):
     L3 =  f3*(c+u)*( dpdx + c*rho*dudx)/(2*c**2)
     
     # Apply the Wall BC
-    #L3 = L1
+    if (bc_type == 'Wall'):
+        L3 = L1
 
     # Transform back to conservative form
     qdot = -(R.dot(np.array([[L1],[L2],[L3]]))).T
     return qdot
     
-def right_b_qdot(q,h):
+def right_b_qdot(q,h,bc_type):
     
     import scipy.interpolate as interp
     import numpy as np
@@ -421,7 +422,8 @@ def right_b_qdot(q,h):
     L3 =  f3*(c+u)*( dpdx + c*rho*dudx)/(2*c**2)
  
     # Apply the Wall BC
-    #L1 = L3
+    if (bc_type == 'Wall'):
+        L1 = L3
 
     # Transform back to conservative form
     qdot = -(R.dot(np.array([[L1],[L2],[L3]]))).T
@@ -601,15 +603,16 @@ def Shock_Tube_Exact(X,P4,T4,P1,T1,time,x0=0.0,M_sh=1.0,mode='data'):
                                                                     
         Usage: Shock_Tube_Exact(x_min,x_max,N,P4,T4,P1,T1,demo=False), where 
                                                                     
-        x_min   = left-boundary of the domain [m]
-        x_max   = right-boundary of the domain [m]
-        N       = total number of points on the grid [-] 
+        X       = vector of all grid points on the domain [m]
+        time    = solution time(s) when exact solution is desired
+        x0      = initial location of the discontinuity [m]
+        M_sh    = shock Mach number if already computed [-]
         P4      = Driver pressure [Pa]
         T4      = Driver temperature [K]
         P1      = Driven pressure [Pa]
         T1      = Driven temperature [K]
         time    = Solution time (vector or scalar) [s]
-        demo    = Flag for running the code in demo mode
+        mode    = Option for running the code in demo mode
                                                                     
     ================================================================
     '''
@@ -665,7 +668,6 @@ def Shock_Tube_Exact(X,P4,T4,P1,T1,time,x0=0.0,M_sh=1.0,mode='data'):
     P_41 = q_L[2]/q_R[2]
     if ((t_vec.shape[0]>1)or(np.isscalar(time) and abs(time)<eps)):
         err = 1.0; cntr = 0; h=1e-30; M_sh = 1.5
-        print('P_41 = %d' % P_41)
         Res = lambda M_sh: -P_41*(1-(gam-1)/(gam+1)*(c_R/c_L)*(M_sh**2-1)/M_sh)**(2*gam/(gam-1))+2*gam/(gam+1)*(M_sh**2-1)+1
         print('Solving the shock tube equation for P_41=%3.1f:' % P_41)
         while (err>eps): 
@@ -683,7 +685,6 @@ def Shock_Tube_Exact(X,P4,T4,P1,T1,time,x0=0.0,M_sh=1.0,mode='data'):
     Nt = t_vec.shape[0]
     alpha  = (gam+1)/(gam-1)
     Q_exact = np.zeros((N,3,Nt))
-    print('M_sh inside function: ',M_sh)
     for k in range(Nt):
 
         #current solution time
@@ -818,6 +819,6 @@ def Shock_Tube_Exact(X,P4,T4,P1,T1,time,x0=0.0,M_sh=1.0,mode='data'):
         Q_exact = Q_exact[:,:,0]
  
     if ((t_vec.shape[0]>1)or(np.isscalar(time) and abs(time)<eps)):
-        print('Exact solution for 1D shock-tube has been generated.\n')
+        print('Exact solution for 1D shock-tube has been generated.')
 
     return Q_exact,M_sh
