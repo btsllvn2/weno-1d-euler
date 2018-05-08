@@ -42,13 +42,10 @@ plot_freq  = 1
 #
 #   Set the left and right boundary conditions:
 # 
-#   left_bc  = ['Non-Reflecting','Wall','Neumann']
-#   right_bc = ['Non-Reflecting','Wall','Neumann']
-#
 #============================================================
-BC_Options = ['Non-Reflecting','Wall','Neumann']
-left_bc  = BC_Options[1]
-right_bc = BC_Options[1]
+BC_Options = ['Non-Reflecting','Neumann','Wall']
+left_bc  = BC_Options[2]
+right_bc = BC_Options[2]
 
 #supress the display output so code runs faster
 if (saveFrames):
@@ -70,11 +67,11 @@ os.system('clear')
 eps = np.finfo('float').eps
 
 # Specify the number of points in the domain (includes ghost points)
-N = 300
+N = 100
 
 # Specifiy target CFL and total number of steps
 CFL = 0.5
-Nt = 5000
+Nt = 500
 
 # Assign fixed, user-specified dt if not in CFL mode
 if(not fixedCFL):

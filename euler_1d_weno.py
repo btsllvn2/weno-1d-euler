@@ -166,8 +166,8 @@ def char_numerical_flux(q):
     
     # -------------------------------------------------------------------------
 
-    # Compute the max wavespeeds
-    #ws = euler_1d_wavespeed(q[Ng:q.shape[0]-Ng,:])
+    # Compute the max wavespeeds on the entire grid
+    ws = euler_1d_wavespeed(q[Ng:q.shape[0]-Ng,:])
 
     # Initialize the arrays
     f_char_p = np.zeros((Nvar, stencil_size))
@@ -180,7 +180,7 @@ def char_numerical_flux(q):
     # Add them together to obatin to find f_char_i_p_half
     
     for i in range(N_x_p_half):
-        ws = euler_1d_wavespeed(q[i:i+stencil_size+1,:])
+        #ws = euler_1d_wavespeed(q[i:i+stencil_size+1,:])
         qi, fi = proj_to_char(q[i:i+stencil_size+1,:], f[i:i+stencil_size+1,:], q_i_p_half[i])
         
         for j in range(stencil_size):
@@ -253,7 +253,6 @@ def proj_to_char(q,f,q_st):
     u = q_st[1]/q_st[0]
     e = q_st[2]
     p = (gam-1)*(e-0.5*rho*u**2)
-    #print('P =',p)
     c = np.sqrt(gam*p/rho) 
 
     #matrix of left eigenvectors of A (eigenvalues in order u-c, u, and u+c)
@@ -284,6 +283,7 @@ def spatial_rhs(f_char,q_cons,dx,left_bc,right_bc):
 
     '''
     import numpy as np
+    import sys,os
     
     # Compute the state vector at the x_{1+1/2} points
     q_i_p_half = (q_cons[2:q_cons.shape[0]-3,:] + q_cons[3:q_cons.shape[0]-2,:])*0.5
@@ -296,7 +296,7 @@ def spatial_rhs(f_char,q_cons,dx,left_bc,right_bc):
     for i in range(N):
 
         #approximate state at x_{i+1/2}
-        q_st = q_i_p_half[i]
+        q_st = q_i_p_half[i,:]
 
         #primitive variables at x_{i+1/2}
         gam = 1.4
@@ -318,27 +318,23 @@ def spatial_rhs(f_char,q_cons,dx,left_bc,right_bc):
     # Initialize rhs
     rhs = np.zeros((N-1,f_char.shape[1]))
 
-    #special options for Neumann-type bc's
-    i_start=1; i_end=rhs.shape[0]-1
-    if(left_bc == 'Neumann'): i_start -= 1
-    if(right_bc == 'Neumann'): i_end += 1
-
-    # Compute qdot at left boundary
+    # Compute qdot at left and right boundaries
     rhs[0,:] = left_b_qdot(np.array(q_cons[3:8,:]),dx,left_bc)
-
-    # Compute qdot at right boundary
     rhs[-1,:] = right_b_qdot(np.array(q_cons[-8:-3,:]),dx,right_bc)
 
-    #update the rhs values on the interior
+    #update the rhs values on the interior (and possibly the boundary)
+    i_start = 1; i_end = rhs.shape[0]-1
+    if (left_bc == 'Neumann'): i_start -= 1
+    if (right_bc == 'Neumann'): i_end += 1
     for i in range(i_start,i_end):   
         
         # Local Right Eigen Matrices
         R_p_half = R[i+1,:,:]
         R_m_half = R[i,:,:]
-        
+ 
         # The local qdot
-        rhs[i,:] = (-1/dx)*( R_p_half.dot((f_char[i+1,:]).T) - R_m_half.dot((f_char[i,:]).T) ).T
-    
+        rhs[i,:] = (-1/dx)*(R_p_half.dot((f_char[i+1,:]))-R_m_half.dot((f_char[i,:])))
+ 
     return rhs
     
 def left_b_qdot(q,h,bc_type):
@@ -392,10 +388,10 @@ def left_b_qdot(q,h,bc_type):
     if (bc_type == 'Wall'): L3 = L1
 
     # Transform back to conservative form
-    qdot = -(R.dot(np.array([[L1],[L2],[L3]]))).T
+    qdot = -R.dot(np.array([L1,L2,L3]))
 
     # Bypass characteristic BC if 'Neumann' is selected
-    if (bc_type == 'Neumann'): qdot = np.zeros(qdot.shape)
+    if (bc_type == 'Neumann'): qdot = np.zeros(qdot.shape) 
 
     return qdot
     
@@ -451,7 +447,7 @@ def right_b_qdot(q,h,bc_type):
     if (bc_type == 'Wall'): L1 = L3
 
     # Transform back to conservative form
-    qdot = -(R.dot(np.array([[L1],[L2],[L3]]))).T
+    qdot = -R.dot(np.array([L1,L2,L3]))
 
     # Bypass characteristic BC if 'Neumann' is selected
     if (bc_type == 'Neumann'): qdot = np.zeros(qdot.shape)
