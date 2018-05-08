@@ -23,14 +23,16 @@ import sys,os
 
 #============================================================
 #
-#   Options for running the code:
+#   General options for running the code:
 #   
+#   Advection  = Run using either WENO5 or 5th-order linear
 #   runQuasi1D = Run with the Q1D rhs source term enabled
 #   saveFrames = Frames from solution are saved to disk
 #   fixedCFL   = Run the code with a constant fixed CFL value
 #   plot_freq  = Frequency of making/saving plots
 #
 #============================================================
+Advection  = 'WENO5'
 runQuasi1D = False
 saveFrames = False
 fixedCFL   = True
@@ -40,12 +42,13 @@ plot_freq  = 1
 #
 #   Set the left and right boundary conditions:
 # 
-#   left_bc  = ['Non-Reflecting','Wall','Zero-Gradient','other']
-#   right_bc = ['Non-Reflecting','Wall','Zero-Gradient','other']
+#   left_bc  = ['Non-Reflecting','Wall','Neumann']
+#   right_bc = ['Non-Reflecting','Wall','Neumann']
 #
 #============================================================
-left_bc  = 'Non-Reflecting'
-right_bc = 'Non-Reflecting'
+BC_Options = ['Non-Reflecting','Wall','Neumann']
+left_bc  = BC_Options[1]
+right_bc = BC_Options[1]
 
 #supress the display output so code runs faster
 if (saveFrames):
@@ -66,16 +69,12 @@ plt.rcParams['figure.figsize'] = (10.0,5.625)
 os.system('clear')
 eps = np.finfo('float').eps
 
-#global constants
-gam = 1.4
-R = 286.9
-
 # Specify the number of points in the domain (includes ghost points)
-N = 100
+N = 300
 
 # Specifiy target CFL and total number of steps
 CFL = 0.5
-Nt = 400
+Nt = 5000
 
 # Assign fixed, user-specified dt if not in CFL mode
 if(not fixedCFL):
@@ -86,10 +85,11 @@ if(not fixedCFL):
 P1,P4,T1,T4 = 1e4,1e5,300,300
 
 # initial conditions for specific run mode
+gam = 1.4; R = 286.9
 if (runQuasi1D):
 
     # Specify the overall domain size
-    X_min,X_max = -0.10,0.60
+    X_min,X_max = -0.40,0.60
 
     #initial location of the discontinuity [m]
     x0 = 0.0
@@ -125,7 +125,7 @@ if (runQuasi1D):
 else:
 
     # Specify the overall domain size
-    X_min,X_max = -0.10,0.10
+    X_min,X_max = -0.60,0.60
     x0 = 0.0
 
     #set the initial condition
@@ -180,7 +180,9 @@ plt.pause(eps)
 
 #perform the time integration
 t_vec = np.zeros(Nt+1)
-print('\nPerforming time integration of %d total steps...' % Nt)
+print('\nLeft-end boundary condition is: %s' % left_bc)
+print('Right-end boundary condition is: %s' % right_bc)
+print('Performing time integration of %d total steps...' % Nt)
 for i in range(1,Nt+1):
 
     #set timestep based on target CFL
@@ -192,19 +194,19 @@ for i in range(1,Nt+1):
     t_vec[i] = t_vec[i-1] + dt
 
     #display to terminal
-    print('n = %d,  CFL = %1.2f,  dt = %1.2e[s],  t = %1.2e[s]' % (i,CFL,dt,t_vec[i]))
+    print('n = %d,  CFL = %1.2f,  dt = %1.2es,  t = %1.2es' % (i,CFL,dt,t_vec[i]))
     
     # Third-order TVD RK Scheme (Shu '97)
     #======================================
-    q = update_ghost_pts(X,q)
+    q = update_ghost_pts(q,left_bc,right_bc)
     L0 = spatial_rhs(char_numerical_flux(q),q,dx,left_bc,right_bc) + q1d_rhs(F_vec,q[3:-3,:])
     q1[3:-3,:] = q[3:-3,:] + L0*dt
     
-    q1 = update_ghost_pts(X,q1)
+    q1 = update_ghost_pts(q1,left_bc,right_bc)
     L1 = spatial_rhs(char_numerical_flux(q1),q1,dx,left_bc,right_bc) + q1d_rhs(F_vec,q1[3:-3,:])
     q2[3:-3,:] = (3/4)*q[3:-3,:] + (1/4)*q1[3:-3,:] + (1/4)*L1*dt
     
-    q2 = update_ghost_pts(X,q2)
+    q2 = update_ghost_pts(q2,left_bc,right_bc)
     L2 = spatial_rhs(char_numerical_flux(q2),q2,dx,left_bc,right_bc) + q1d_rhs(F_vec,q2[3:-3,:])
     q[3:-3,:] = (1/3)*q[3:-3,:] + (2/3)*q2[3:-3,:]  + (2/3)*L2*dt    
     #======================================
@@ -222,7 +224,7 @@ for i in range(1,Nt+1):
     #real-time animation 
     if(i%plot_freq==0):
         if(runQuasi1D): 
-            plt.title('Solution to GALCIT Nozzle Flow Using WENO-JS ($P_{41}$=%d, t=%2.3f[ms])' % (P_41,1e3*t_vec[i]),fontsize=15)
+            plt.title('Solution to GALCIT Nozzle Flow Using WENO-JS ($P_{41}$=%d, t=%2.3fms)' % (P_41,1e3*t_vec[i]),fontsize=15)
             line2.set_ydata(M_plt)
         else:
             #compute the exact solution for the 1D shock-tube problem
@@ -234,7 +236,7 @@ for i in range(1,Nt+1):
             M_ex = np.sqrt(rho_ex*u_ex**2/(gam*p_ex))
             line1.set_ydata(rho_ex)
             line2.set_ydata(q[3:N-3,0])
-            plt.title("Sod's Shock Tube Problem ($P_{41}$=%d, t=%2.3f[ms])" % (P_41,1e3*t_vec[i]),fontsize=15)
+            plt.title("Sod's Shock Tube Problem ($P_{41}$=%d, t=%2.3fms)" % (P_41,1e3*t_vec[i]),fontsize=15)
         if (saveFrames): plt.savefig('frames/frame%08d.png' % int(i/plot_freq))
         plt.pause(eps)
 

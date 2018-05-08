@@ -110,13 +110,34 @@ def langrange_extrap(x_in,q_in,x_ext):
 
     return q_ext
 
-def update_ghost_pts(X,q):
+def update_ghost_pts(q,left_bc,right_bc):
 
-    #assign the ghost cell values
-    for i in range(3):
-        q[(2-i),:]  = (10*(i+1))**10
-        q[-(3-i),:] = (10*(i+1))**10
-        
+    #assign left-end ghost cell values
+    if (left_bc == 'Wall'):
+        for i in range(3):
+            q[(2-i),0] =  q[(i+4),0]
+            q[(2-i),1] = -q[(i+4),1]
+            q[(2-i),2] =  q[(i+4),2]
+    elif (left_bc == 'Neumann'):
+        for i in range(3):
+            q[(2-i),:] =  q[4,:]
+    else:
+        for i in range(3):
+            q[(2-i),:]  = (10*(i+1))**10
+
+    #assign right-end ghost cell values
+    if (right_bc == 'Wall'):
+        for i in range(3):
+            q[-(3-i),0] =  q[-(i+5),0]
+            q[-(3-i),1] = -q[-(i+5),1]
+            q[-(3-i),2] =  q[-(i+5),2]
+    elif (right_bc == 'Neumann'):
+        for i in range(3):
+            q[-(3-i),:] =  q[-4,:]
+    else:
+        for i in range(3):
+            q[-(3-i),:] = (10*(i+1))**10
+
     return(q)
 
 def char_numerical_flux(q):
@@ -297,10 +318,19 @@ def spatial_rhs(f_char,q_cons,dx,left_bc,right_bc):
     # Initialize rhs
     rhs = np.zeros((N-1,f_char.shape[1]))
 
-    # Compute qdot at wall boundary
+    #special options for Neumann-type bc's
+    i_start=1; i_end=rhs.shape[0]-1
+    if(left_bc == 'Neumann'): i_start -= 1
+    if(right_bc == 'Neumann'): i_end += 1
+
+    # Compute qdot at left boundary
     rhs[0,:] = left_b_qdot(np.array(q_cons[3:8,:]),dx,left_bc)
-    
-    for i in range(1,rhs.shape[0]-1):   
+
+    # Compute qdot at right boundary
+    rhs[-1,:] = right_b_qdot(np.array(q_cons[-8:-3,:]),dx,right_bc)
+
+    #update the rhs values on the interior
+    for i in range(i_start,i_end):   
         
         # Local Right Eigen Matrices
         R_p_half = R[i+1,:,:]
@@ -308,9 +338,6 @@ def spatial_rhs(f_char,q_cons,dx,left_bc,right_bc):
         
         # The local qdot
         rhs[i,:] = (-1/dx)*( R_p_half.dot((f_char[i+1,:]).T) - R_m_half.dot((f_char[i,:]).T) ).T
-
-    # Compute qdot at non-reflecting boundary
-    rhs[rhs.shape[0]-1,:] = right_b_qdot(np.array(q_cons[-8:-3,:]),dx,right_bc)
     
     return rhs
     
@@ -347,9 +374,7 @@ def left_b_qdot(q,h,bc_type):
     dudx =   (-25*uarr[0]  +48*uarr[1]  -36*uarr[2]  +16*uarr[3]  -3*uarr[4]  )/(12*h)
     
     # Apply the NRBC
-    f1 = 1
-    f2 = 1
-    f3 = 1
+    f1,f2,f3 = 1,1,1
 
     if(u-c > 0):
         f1 = 0
@@ -364,11 +389,14 @@ def left_b_qdot(q,h,bc_type):
     L3 =  f3*(c+u)*( dpdx + c*rho*dudx)/(2*c**2)
     
     # Apply the Wall BC
-    if (bc_type == 'Wall'):
-        L3 = L1
+    if (bc_type == 'Wall'): L3 = L1
 
     # Transform back to conservative form
     qdot = -(R.dot(np.array([[L1],[L2],[L3]]))).T
+
+    # Bypass characteristic BC if 'Neumann' is selected
+    if (bc_type == 'Neumann'): qdot = np.zeros(qdot.shape)
+
     return qdot
     
 def right_b_qdot(q,h,bc_type):
@@ -405,9 +433,7 @@ def right_b_qdot(q,h,bc_type):
     dudx =   (3*uarr[-5]  -16*uarr[-4]  +36*uarr[-3]  -48*uarr[-2]  +25*uarr[-1]  )/(12*h)
     
     # Apply the NRBC
-    f1 = 1
-    f2 = 1
-    f3 = 1
+    f1,f2,f3 = 1,1,1
 
     if(u-c < 0):
         f1 = 0
@@ -422,11 +448,13 @@ def right_b_qdot(q,h,bc_type):
     L3 =  f3*(c+u)*( dpdx + c*rho*dudx)/(2*c**2)
  
     # Apply the Wall BC
-    if (bc_type == 'Wall'):
-        L1 = L3
+    if (bc_type == 'Wall'): L1 = L3
 
     # Transform back to conservative form
     qdot = -(R.dot(np.array([[L1],[L2],[L3]]))).T
+
+    # Bypass characteristic BC if 'Neumann' is selected
+    if (bc_type == 'Neumann'): qdot = np.zeros(qdot.shape)
 
     return qdot
 
@@ -454,7 +482,6 @@ def q1d_rhs(f_vec,q):
         rhs[i,:] = -f_vec[i]*flux[i,:]
 
     return rhs
-
     
 f_num = 1
 def areaFunc(x,r,X_vec,makePlot=False,demo=False):
