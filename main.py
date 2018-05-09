@@ -7,8 +7,10 @@
 #   of the characteristic type by Thompson[2]. Time-stepping is via
 #   the third-order TVD Runge-Kutta scheme suggested by Shu[3].
 #
+#   B. Sullivan and S. R. Murthy, 2018
+#
 #   [1] "Efficient Implementation of Weighted ENO Schemes"
-#   Guang-SHan Jiang and Chi-Wang Shu
+#   Guang-Shan Jiang and Chi-Wang Shu
 #   JCP, 126(1): 202-228, 1996
 #
 #   [2] "Time-dependent Boundary Conditions for Hyperbolic Systems II"
@@ -39,14 +41,14 @@ import sys,os
 #   General options for running the code:
 #   
 #   Advection  = Run using either WENO or 5th-order linear
-#   runQuasi1D = Run with the Q1D rhs source term enabled
+#   runQuasi1D = Run with Q1D rhs source term enabled
 #   saveFrames = Frames from solution are saved to disk
 #   fixedCFL   = Run the code with a constant fixed CFL value
 #   plot_freq  = Frequency of making/saving plots
 #
 #============================================================
-Adv_Options = ['WENO', 'LINEAR-FD']
-Advection  = Adv_Options[0]
+Adv_Options = ['LINEAR-FD','WENO']
+Advection  = Adv_Options[1]
 runQuasi1D = True
 saveFrames = True
 fixedCFL   = True
@@ -57,9 +59,9 @@ plot_freq  = 1
 #   Set the left and right boundary conditions:
 # 
 #============================================================
-BC_Options = ['Non-Reflecting','Neumann','Wall']
+BC_Options = ['Non-Reflecting','Neumann','Wall','Force-Free']
 left_bc  = BC_Options[0]
-right_bc = BC_Options[1]
+right_bc = BC_Options[0]
 
 #supress the display output so code runs faster
 if (saveFrames):
@@ -81,19 +83,16 @@ os.system('clear')
 eps = np.finfo('float').eps
 
 # Specify the number of points in the domain (includes ghost points)
-N = 300
+N = 100
 
 # Specifiy target CFL and total number of steps
 CFL = 0.5
-Nt = 1200
+Nt = 1000
 
 # Assign fixed, user-specified dt if not in CFL mode
 if(not fixedCFL):
     dt = input('What fixed timestep dt should be used? (s) ')
     print('Using a fixed timestep of dt = %1.6e seconds.' % dt)
-
-# Specify the Pressure and temperature values of the initial condition
-P1,P4,T1,T4 = 1e4,1e5,300,300
 
 # initial conditions for specific run mode
 gam = 1.4; R = 286.9
@@ -107,7 +106,7 @@ if (runQuasi1D):
 
     #set the initial condition
     rho4 = 1.0
-    P4 = 1e10
+    P4 = 1e6
     T4 = P4/(R*rho4)
     rho1 = 0.125
     P1 = 1e4
@@ -191,9 +190,12 @@ plt.pause(eps)
 
 #perform the time integration
 t_vec = np.zeros(Nt+1)
-print('\nLeft-end boundary condition is: %s' % left_bc)
-print('Right-end boundary condition is: %s' % right_bc)
-print('Performing time integration of Nt=%d total steps...' % Nt)
+print('\n=====================================================')
+print('   Selected advection scheme is: %s' % Advection)
+print('   Left-end boundary condition is: %s' % left_bc)
+print('   Right-end boundary condition is: %s' % right_bc)
+print('=====================================================\n')
+print('Performing time integration with Nt=%d total steps...' % Nt)
 for i in range(1,Nt+1):
 
     #set timestep based on target CFL
@@ -293,7 +295,7 @@ def make_XT_plot(var,v_label):
 
 #make an xt-plot for each variable
 var_lst = [RHO,P,TEMP,M,U,1e-6*E,ENTROPY]
-label_lst = [r'Density [kg/m^3]',r'Pressure [Pa]',r'Temperature [K]',r'Mach [-]',r'Velocity [m/s]',r'Specific Energy [MJ/kg]',r'Measure of Entropy']
+label_lst = [r'Density [kg/$m^3$]',r'Pressure [Pa]',r'Temperature [K]',r'Mach [-]',r'Velocity [m/s]',r'Specific Energy [MJ/kg]',r'Measure of Entropy']
 for i in range(len(var_lst)): make_XT_plot(var_lst[i],label_lst[i])
 
 plt.show()  

@@ -81,8 +81,8 @@ def euler_1d_wavespeed(q):
     t = p/(R*rho)
     if (t.min()<0.0):
         print('\n============================================================')
-        print('   Warning: Negative temperature detected!!!')
-        print('   Solution is numerically unstanble. Now exiting....' % t.min())
+        print('     Warning: Negative temperature detected!!!')
+        print('     Solution is numerically unstable. Now exiting....' % t.min())
         print('============================================================\n\n')
         sys.exit()
     c = np.sqrt(gam*p/rho) 
@@ -583,7 +583,7 @@ def areaFunc(x,r,X_vec,makePlot=False,demo=False):
    
 
     #Compute the isentropic solution for the nozzle flow
-    print('Computing isentropic nozzle solution')
+    print('Computing the isentropic nozzle solution...')
     Mach_vec = np.zeros(F_vec.shape)
     def Res(M,AR): return (2/(gam+1)*(1+0.5*(gam-1)*M**2))**((gam+1)/(2*(gam-1)))-M*AR
     for i in range(X_vec.shape[0]):
