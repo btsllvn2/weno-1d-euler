@@ -3,9 +3,22 @@
 #   A Python code which utilizes the various functions supplied in
 #   "euler_1d_weno.py" to numerically solve the unsteady, Quasi-1D
 #   Euler equations using a finite-difference formulation of the 5th-
-#   order WENO scheme of Jiang and Shu '96. Boundary conditions are 
-#   of the characteristic type by Thompson '90. Time-stepping is the
-#   third-order TVD Runge-Kutta scheme suggested by Shu '97.
+#   order WENO scheme by Jiang and Shu[1]. Boundary conditions are 
+#   of the characteristic type by Thompson[2]. Time-stepping is via
+#   the third-order TVD Runge-Kutta scheme suggested by Shu[3].
+#
+#   [1] "Efficient Implementation of Weighted ENO Schemes"
+#   Guang-SHan Jiang and Chi-Wang Shu
+#   JCP, 126(1): 202-228, 1996
+#
+#   [2] "Time-dependent Boundary Conditions for Hyperbolic Systems II"
+#   Kevin M. Thompson
+#   JCP, 89(2): 439-461, 1990
+#
+#   [3] "Essentially Non-Oscillatory and Weighted Essentially Non-
+#    Oscillatory Schemes for Hyperbolic Conservation Laws"
+#   Chi-Wang Shu
+#   NASA/CR-97-206253, ICASE Report No. 97-65, 1997
 #
 #   Terminology:
 #   q       = Physical state variables
@@ -15,7 +28,7 @@
 #
 #======================================================================
 
-# Import the libraries that you need
+#Import essential library functions
 from euler_1d_weno import *
 import scipy.linalg as la 
 import numpy as np
@@ -25,16 +38,17 @@ import sys,os
 #
 #   General options for running the code:
 #   
-#   Advection  = Run using either WENO5 or 5th-order linear
+#   Advection  = Run using either WENO or 5th-order linear
 #   runQuasi1D = Run with the Q1D rhs source term enabled
 #   saveFrames = Frames from solution are saved to disk
 #   fixedCFL   = Run the code with a constant fixed CFL value
 #   plot_freq  = Frequency of making/saving plots
 #
 #============================================================
-Advection  = 'WENO5'
-runQuasi1D = False
-saveFrames = False
+Adv_Options = ['WENO', 'LINEAR-FD']
+Advection  = Adv_Options[0]
+runQuasi1D = True
+saveFrames = True
 fixedCFL   = True
 plot_freq  = 1
 
@@ -44,8 +58,8 @@ plot_freq  = 1
 # 
 #============================================================
 BC_Options = ['Non-Reflecting','Neumann','Wall']
-left_bc  = BC_Options[2]
-right_bc = BC_Options[2]
+left_bc  = BC_Options[0]
+right_bc = BC_Options[1]
 
 #supress the display output so code runs faster
 if (saveFrames):
@@ -67,11 +81,11 @@ os.system('clear')
 eps = np.finfo('float').eps
 
 # Specify the number of points in the domain (includes ghost points)
-N = 100
+N = 300
 
 # Specifiy target CFL and total number of steps
 CFL = 0.5
-Nt = 500
+Nt = 1200
 
 # Assign fixed, user-specified dt if not in CFL mode
 if(not fixedCFL):
@@ -93,7 +107,7 @@ if (runQuasi1D):
 
     #set the initial condition
     rho4 = 1.0
-    P4 = 1e6
+    P4 = 1e10
     T4 = P4/(R*rho4)
     rho1 = 0.125
     P1 = 1e4
@@ -179,7 +193,7 @@ plt.pause(eps)
 t_vec = np.zeros(Nt+1)
 print('\nLeft-end boundary condition is: %s' % left_bc)
 print('Right-end boundary condition is: %s' % right_bc)
-print('Performing time integration of %d total steps...' % Nt)
+print('Performing time integration of Nt=%d total steps...' % Nt)
 for i in range(1,Nt+1):
 
     #set timestep based on target CFL
@@ -196,15 +210,15 @@ for i in range(1,Nt+1):
     # Third-order TVD RK Scheme (Shu '97)
     #======================================
     q = update_ghost_pts(q,left_bc,right_bc)
-    L0 = spatial_rhs(char_numerical_flux(q),q,dx,left_bc,right_bc) + q1d_rhs(F_vec,q[3:-3,:])
+    L0 = spatial_rhs(char_numerical_flux(q,Advection),q,dx,left_bc,right_bc) + q1d_rhs(F_vec,q[3:-3,:])
     q1[3:-3,:] = q[3:-3,:] + L0*dt
     
     q1 = update_ghost_pts(q1,left_bc,right_bc)
-    L1 = spatial_rhs(char_numerical_flux(q1),q1,dx,left_bc,right_bc) + q1d_rhs(F_vec,q1[3:-3,:])
+    L1 = spatial_rhs(char_numerical_flux(q1,Advection),q1,dx,left_bc,right_bc) + q1d_rhs(F_vec,q1[3:-3,:])
     q2[3:-3,:] = (3/4)*q[3:-3,:] + (1/4)*q1[3:-3,:] + (1/4)*L1*dt
     
     q2 = update_ghost_pts(q2,left_bc,right_bc)
-    L2 = spatial_rhs(char_numerical_flux(q2),q2,dx,left_bc,right_bc) + q1d_rhs(F_vec,q2[3:-3,:])
+    L2 = spatial_rhs(char_numerical_flux(q2,Advection),q2,dx,left_bc,right_bc) + q1d_rhs(F_vec,q2[3:-3,:])
     q[3:-3,:] = (1/3)*q[3:-3,:] + (2/3)*q2[3:-3,:]  + (2/3)*L2*dt    
     #======================================
 

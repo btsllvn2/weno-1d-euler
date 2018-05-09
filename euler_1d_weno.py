@@ -69,13 +69,22 @@ def euler_1d_wavespeed(q):
 
     import scipy.linalg as la
     import numpy as np
+    import sys,os
 
     #primitive variables
     gam = 1.4
+    R = 286.9
     rho = q[:,0]
     u = q[:,1]/q[:,0]
     e = q[:,2]
     p = (gam-1.0)*(e-0.5*rho*u**2)
+    t = p/(R*rho)
+    if (t.min()<0.0):
+        print('\n============================================================')
+        print('   Warning: Negative temperature detected!!!')
+        print('   Solution is numerically unstanble. Now exiting....' % t.min())
+        print('============================================================\n\n')
+        sys.exit()
     c = np.sqrt(gam*p/rho) 
 
     #define max wavespeed(s) on the grid for LF splitting
@@ -140,7 +149,7 @@ def update_ghost_pts(q,left_bc,right_bc):
 
     return(q)
 
-def char_numerical_flux(q):
+def char_numerical_flux(q,adv):
 
     import numpy as np
     
@@ -189,19 +198,19 @@ def char_numerical_flux(q):
 
         # Compute the i + 1/2 points flux
         for k in range(0, Nvar):
-            f_char_i_p_half[i,k] = phi_weno5(f_char_p[k,:]) + phi_weno5(f_char_m[k,::-1])    
+            f_char_i_p_half[i,k] = phi_weno5(f_char_p[k,:],adv) + phi_weno5(f_char_m[k,::-1],adv)    
     
     return f_char_i_p_half
 
 
-def phi_weno5(f_char_p_s):
+def phi_weno5(f_char_p_s,adv):
     '''
     Function which computes a 5th-order WENO reconstruction of the numerical
     flux at location x_{i+1/2}, works regardless of the sign of f'(u)
     '''
 
     import numpy as np
-   
+
     #assign the fluxes at each point in the full stencil 
     f_i_m_2 = f_char_p_s[0]
     f_i_m_1 = f_char_p_s[1]
@@ -230,8 +239,8 @@ def phi_weno5(f_char_p_s):
     w1 = w1_tilde/(w0_tilde + w1_tilde + w2_tilde)
     w2 = w2_tilde/(w0_tilde + w1_tilde + w2_tilde)
     
-    #hardcode optimal linear weights
-    #w0 = 0.1; w1 = 0.6; w2 = 0.3;
+    #overwrite WENO nonlinear weights with optimal linear weights
+    if (adv=='LINEAR-FD'): w0 = 0.1; w1 = 0.6; w2 = 0.3;
    
     #linear convex combination of (3) substencil reconstructions
     f_char_i_p_half_p_s = w0*f0 + w1*f1 + w2*f2
