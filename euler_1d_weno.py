@@ -380,13 +380,9 @@ def left_b_qdot(q,h,bc_type):
     
     # Apply the NRBC
     f1,f2,f3 = 1,1,1
-
-    if(u-c > 0):
-        f1 = 0
-    if(u > 0):
-        f2 = 0
-    if(u+c > 0):
-        f3 = 0
+    if(u-c > 0): f1 = 0
+    if(u > 0): f2 = 0
+    if(u+c > 0): f3 = 0
     
     # Compute the wave amplitudes
     L1 =  f1*(c-u)*(-dpdx + c*rho*dudx)/(2*c**2)
@@ -394,7 +390,10 @@ def left_b_qdot(q,h,bc_type):
     L3 =  f3*(c+u)*( dpdx + c*rho*dudx)/(2*c**2)
     
     # Apply the Wall BC
-    if (bc_type == 'Wall'): L3 = L1
+    if (bc_type == 'Wall'): 
+        L3 = L1
+    elif (bc_type == 'Force-Free'):
+        L3 = L1 + 2*rho*c*(u*dudx)
 
     # Transform back to conservative form
     qdot = -R.dot(np.array([L1,L2,L3]))
@@ -439,13 +438,9 @@ def right_b_qdot(q,h,bc_type):
     
     # Apply the NRBC
     f1,f2,f3 = 1,1,1
-
-    if(u-c < 0):
-        f1 = 0
-    if(u < 0):
-        f2 = 0
-    if(u+c < 0):
-        f3 = 0
+    if(u-c < 0): f1 = 0
+    if(u < 0): f2 = 0
+    if(u+c < 0): f3 = 0
     
     # Compute the wave amplitudes
     L1 =  f1*(c-u)*(-dpdx + c*rho*dudx)/(2*c**2)
@@ -453,7 +448,10 @@ def right_b_qdot(q,h,bc_type):
     L3 =  f3*(c+u)*( dpdx + c*rho*dudx)/(2*c**2)
  
     # Apply the Wall BC
-    if (bc_type == 'Wall'): L1 = L3
+    if (bc_type == 'Wall'): 
+        L1 = L3
+    elif (bc_type == 'Force-Free'):
+        L1 = L3 - 2*rho*c*(u*dudx)
 
     # Transform back to conservative form
     qdot = -R.dot(np.array([L1,L2,L3]))

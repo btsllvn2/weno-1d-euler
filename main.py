@@ -49,8 +49,8 @@ import sys,os
 #============================================================
 Adv_Options = ['LINEAR-FD','WENO']
 Advection  = Adv_Options[1]
-runQuasi1D = True
-saveFrames = True
+runQuasi1D = False
+saveFrames = False
 fixedCFL   = True
 plot_freq  = 1
 
@@ -83,11 +83,11 @@ os.system('clear')
 eps = np.finfo('float').eps
 
 # Specify the number of points in the domain (includes ghost points)
-N = 100
+N = 250
 
 # Specifiy target CFL and total number of steps
 CFL = 0.5
-Nt = 1000
+Nt = 400
 
 # Assign fixed, user-specified dt if not in CFL mode
 if(not fixedCFL):
