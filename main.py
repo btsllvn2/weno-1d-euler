@@ -49,9 +49,9 @@ import sys,os
 #============================================================
 Adv_Options = ['LINEAR-FD','WENO']
 Advection  = Adv_Options[1]
-runQuasi1D = False
+runQuasi1D = True
 saveFrames = False
-fixedCFL   = True
+fixedCFL   = False
 plot_freq  = 1
 
 #============================================================
@@ -83,15 +83,15 @@ os.system('clear')
 eps = np.finfo('float').eps
 
 # Specify the number of points in the domain (includes ghost points)
-N = 250
+N = 100
 
 # Specifiy target CFL and total number of steps
 CFL = 0.5
-Nt = 400
+Nt = 700
 
 # Assign fixed, user-specified dt if not in CFL mode
 if(not fixedCFL):
-    dt = input('What fixed timestep dt should be used? (s) ')
+    dt = float(input('What fixed timestep dt should be used? (s) '))
     print('Using a fixed timestep of dt = %1.6e seconds.' % dt)
 
 # initial conditions for specific run mode
@@ -140,7 +140,7 @@ else:
 
     #set the initial condition
     rho4 = 1.0
-    P4 = 1e5
+    P4 = 1e6
     T4 = P4/(R*rho4)
     rho1 = 0.125
     P1 = 1e4
@@ -199,9 +199,11 @@ print('Performing time integration with Nt=%d total steps...' % Nt)
 for i in range(1,Nt+1):
 
     #set timestep based on target CFL
+    ws_max = np.max(euler_1d_wavespeed(q))
     if(fixedCFL):
-        ws_max = np.max(euler_1d_wavespeed(q))
         dt = CFL*dx/ws_max
+    else:
+        CFL = ws_max*dt/dx
 
     #update the time history
     t_vec[i] = t_vec[i-1] + dt
@@ -212,15 +214,18 @@ for i in range(1,Nt+1):
     # Third-order TVD RK Scheme (Shu '97)
     #======================================
     q = update_ghost_pts(q,left_bc,right_bc)
-    L0 = spatial_rhs(char_numerical_flux(q,Advection),q,dx,left_bc,right_bc) + q1d_rhs(F_vec,q[3:-3,:])
+    L0 = spatial_rhs(char_numerical_flux(q,Advection),q,dx,left_bc,right_bc) + \
+         q1d_rhs(F_vec,q[3:-3,:],left_bc,right_bc)
     q1[3:-3,:] = q[3:-3,:] + L0*dt
     
     q1 = update_ghost_pts(q1,left_bc,right_bc)
-    L1 = spatial_rhs(char_numerical_flux(q1,Advection),q1,dx,left_bc,right_bc) + q1d_rhs(F_vec,q1[3:-3,:])
+    L1 = spatial_rhs(char_numerical_flux(q1,Advection),q1,dx,left_bc,right_bc) + \
+         q1d_rhs(F_vec,q1[3:-3,:],left_bc,right_bc)
     q2[3:-3,:] = (3/4)*q[3:-3,:] + (1/4)*q1[3:-3,:] + (1/4)*L1*dt
     
     q2 = update_ghost_pts(q2,left_bc,right_bc)
-    L2 = spatial_rhs(char_numerical_flux(q2,Advection),q2,dx,left_bc,right_bc) + q1d_rhs(F_vec,q2[3:-3,:])
+    L2 = spatial_rhs(char_numerical_flux(q2,Advection),q2,dx,left_bc,right_bc) + \
+         q1d_rhs(F_vec,q2[3:-3,:],left_bc,right_bc)
     q[3:-3,:] = (1/3)*q[3:-3,:] + (2/3)*q2[3:-3,:]  + (2/3)*L2*dt    
     #======================================
 

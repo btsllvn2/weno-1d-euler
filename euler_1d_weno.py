@@ -121,26 +121,26 @@ def langrange_extrap(x_in,q_in,x_ext):
 
 def update_ghost_pts(q,left_bc,right_bc):
 
-    #assign left-end ghost cell values
-    if (left_bc == 'Wall'):
+    ##assign left-end ghost cell values
+    #if (left_bc == 'Wall'):
+    #    for i in range(3):
+    #        q[(2-i),0] =  q[(i+4),0]
+    #        q[(2-i),1] = -q[(i+4),1]
+    #        q[(2-i),2] =  q[(i+4),2]
+    if (left_bc == 'Neumann'):
         for i in range(3):
-            q[(2-i),0] =  q[(i+4),0]
-            q[(2-i),1] = -q[(i+4),1]
-            q[(2-i),2] =  q[(i+4),2]
-    elif (left_bc == 'Neumann'):
-        for i in range(3):
-            q[(2-i),:] =  q[4,:]
+            q[(2-i),:] =  q[3,:]
     else:
         for i in range(3):
             q[(2-i),:]  = (10*(i+1))**10
 
     #assign right-end ghost cell values
-    if (right_bc == 'Wall'):
-        for i in range(3):
-            q[-(3-i),0] =  q[-(i+5),0]
-            q[-(3-i),1] = -q[-(i+5),1]
-            q[-(3-i),2] =  q[-(i+5),2]
-    elif (right_bc == 'Neumann'):
+    #if (right_bc == 'Wall'):
+    #    for i in range(3):
+    #        q[-(3-i),0] =  q[-(i+5),0]
+    #        q[-(3-i),1] = -q[-(i+5),1]
+    #        q[-(3-i),2] =  q[-(i+5),2]
+    if (right_bc == 'Neumann'):
         for i in range(3):
             q[-(3-i),:] =  q[-4,:]
     else:
@@ -379,21 +379,20 @@ def left_b_qdot(q,h,bc_type):
     dudx =   (-25*uarr[0]  +48*uarr[1]  -36*uarr[2]  +16*uarr[3]  -3*uarr[4]  )/(12*h)
     
     # Apply the NRBC
-    f1,f2,f3 = 1,1,1
-    if(u-c > 0): f1 = 0
-    if(u > 0): f2 = 0
-    if(u+c > 0): f3 = 0
+    f = np.ones(3)
+    for j in range(3): 
+        if(R[1,j]>0): f[j]=0
     
     # Compute the wave amplitudes
-    L1 =  f1*(c-u)*(-dpdx + c*rho*dudx)/(2*c**2)
-    L2 =  f2*u*( -dpdx/c**2 + drhodx )
-    L3 =  f3*(c+u)*( dpdx + c*rho*dudx)/(2*c**2)
+    L1 =  f[0]*(u-c)*(dpdx-rho*c*dudx)/(2*c**2)
+    L2 =  f[1]*u*(drhodx-dpdx/c**2)
+    L3 =  f[2]*(u+c)*(dpdx+rho*c*dudx)/(2*c**2)
     
     # Apply the Wall BC
     if (bc_type == 'Wall'): 
         L3 = L1
     elif (bc_type == 'Force-Free'):
-        L3 = L1 + 2*rho*c*(u*dudx)
+        L3 = L1+2*rho*c*(u*dudx)
 
     # Transform back to conservative form
     qdot = -R.dot(np.array([L1,L2,L3]))
@@ -437,21 +436,20 @@ def right_b_qdot(q,h,bc_type):
     dudx =   (3*uarr[-5]  -16*uarr[-4]  +36*uarr[-3]  -48*uarr[-2]  +25*uarr[-1]  )/(12*h)
     
     # Apply the NRBC
-    f1,f2,f3 = 1,1,1
-    if(u-c < 0): f1 = 0
-    if(u < 0): f2 = 0
-    if(u+c < 0): f3 = 0
+    f = np.ones(3)
+    for j in range(3):
+        if(R[1,j]<0): f[j]=0
     
     # Compute the wave amplitudes
-    L1 =  f1*(c-u)*(-dpdx + c*rho*dudx)/(2*c**2)
-    L2 =  f2*u*( -dpdx/c**2 + drhodx )
-    L3 =  f3*(c+u)*( dpdx + c*rho*dudx)/(2*c**2)
- 
+    L1 =  f[0]*(u-c)*(dpdx-rho*c*dudx)/(2*c**2)
+    L2 =  f[1]*u*(drhodx-dpdx/c**2)
+    L3 =  f[2]*(u+c)*(dpdx+rho*c*dudx)/(2*c**2)
+
     # Apply the Wall BC
     if (bc_type == 'Wall'): 
         L1 = L3
     elif (bc_type == 'Force-Free'):
-        L1 = L3 - 2*rho*c*(u*dudx)
+        L1 = L3-2*rho*c*(u*dudx)
 
     # Transform back to conservative form
     qdot = -R.dot(np.array([L1,L2,L3]))
@@ -462,7 +460,7 @@ def right_b_qdot(q,h,bc_type):
     return qdot
 
 #source term which accounts for quasi-1D area variation
-def q1d_rhs(f_vec,q): 
+def q1d_rhs(f_vec,q,left_bc,right_bc): 
 
     import numpy as np
 
@@ -483,6 +481,10 @@ def q1d_rhs(f_vec,q):
     rhs = np.zeros(flux.shape)
     for i in range(q.shape[0]):
         rhs[i,:] = -f_vec[i]*flux[i,:]
+
+    #BC handling
+    #rhs[0,:] = 0.0
+    #rhs[-1,:] = 0.0
 
     return rhs
     
