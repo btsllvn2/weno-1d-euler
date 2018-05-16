@@ -482,10 +482,6 @@ def q1d_rhs(f_vec,q,left_bc,right_bc):
     for i in range(q.shape[0]):
         rhs[i,:] = -f_vec[i]*flux[i,:]
 
-    #BC handling
-    #rhs[0,:] = 0.0
-    #rhs[-1,:] = 0.0
-
     return rhs
     
 f_num = 1

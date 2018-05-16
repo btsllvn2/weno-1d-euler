@@ -42,17 +42,19 @@ import sys,os
 #   
 #   Advection  = Run using either WENO or 5th-order linear
 #   runQuasi1D = Run with Q1D rhs source term enabled
+#   saveBCData = Save the solution to use as an imposed bc
 #   saveFrames = Frames from solution are saved to disk
 #   fixedCFL   = Run the code with a constant fixed CFL value
 #   plot_freq  = Frequency of making/saving plots
 #
 #============================================================
-Adv_Options = ['LINEAR-FD','WENO']
-Advection  = Adv_Options[1]
-runQuasi1D = True
-saveFrames = False
-fixedCFL   = False
-plot_freq  = 1
+Adv_Options = ['WENO','LINEAR-FD']
+Advection   = Adv_Options[0]
+runQuasi1D  = True
+saveBCData  = False
+saveFrames  = False
+fixedCFL    = True
+plot_freq   = 1
 
 #============================================================
 #
@@ -83,11 +85,11 @@ os.system('clear')
 eps = np.finfo('float').eps
 
 # Specify the number of points in the domain (includes ghost points)
-N = 100
+Nx = 150
 
 # Specifiy target CFL and total number of steps
 CFL = 0.5
-Nt = 700
+Nt = 1200
 
 # Assign fixed, user-specified dt if not in CFL mode
 if(not fixedCFL):
@@ -111,7 +113,7 @@ if (runQuasi1D):
     rho1 = 0.125
     P1 = 1e4
     T1 = P1/(R*rho1)
-    q_init,X,dx = init_cond(X_min,X_max,N,P4,T4,P1,T1,x0)
+    q_init,X,dx = init_cond(X_min,X_max,Nx,P4,T4,P1,T1,x0)
 
     #define the shock-tube and nozzle geometry
     Geom_Dat = np.array([[-17.00000,  0.0568613],
@@ -140,12 +142,12 @@ else:
 
     #set the initial condition
     rho4 = 1.0
-    P4 = 1e6
+    P4 = 1e5
     T4 = P4/(R*rho4)
     rho1 = 0.125
     P1 = 1e4
     T1 = P1/(R*rho1)
-    q_init,X,dx = init_cond(X_min,X_max,N,P4,T4,P1,T1,x0)
+    q_init,X,dx = init_cond(X_min,X_max,Nx,P4,T4,P1,T1,x0)
 
     #force Q1D source term to be identically zero
     F_vec = np.zeros(X[3:-3].shape)
@@ -170,15 +172,15 @@ plt.figure()
 if(runQuasi1D):
     print('Shock tube operating pressure ratio P_41 = %d' % P_41)
     plt.title('Solution to GALCIT Nozzle Flow Using WENO-JS ($P_{41}$=%d, t=%2.3f[ms])' %(P_41,0.0),fontsize=15)
-    line1, = plt.plot(X[3:N-3],Mach_vec,'--k',label='Isentropic Solution',linewidth=1.0)
-    line2, = plt.plot(X[3:N-3],M_plt,'-b',label='WENO-JS',linewidth=3.0)
+    line1, = plt.plot(X[3:-3],Mach_vec,'--k',label='Isentropic Solution (Steady)',linewidth=1.0)
+    line2, = plt.plot(X[3:-3],M_plt,'-b',label='WENO-JS',linewidth=3.0)
     plt.legend(loc=2,fontsize=12)
     plt.ylabel('Mach',fontsize=15)
     plt.ylim(0,5.0)
 else:
     Q_exact,M_sh = Shock_Tube_Exact(X,P4,T4,P1,T1,0.0,x0,1.0)
-    line1, = plt.plot(X[3:N-3],Q_exact[3:-3,0],'-k',linewidth=1.0,label='Exact Solution')
-    line2, = plt.plot(X[3:N-3],q_init[3:N-3,0],'ob',label='WENO-JS')
+    line1, = plt.plot(X[3:-3],Q_exact[3:-3,0],'-k',linewidth=1.0,label='Exact Solution')
+    line2, = plt.plot(X[3:-3],q_init[3:-3,0],'ob',label='WENO-JS')
     plt.title("Sod's Shock Tube Problem ($P_{41}$=%d, t=%2.3f[ms])" % (P_41,0.0),fontsize=15)
     plt.ylabel('Density',fontsize=15)
     plt.legend(fontsize=12)
@@ -198,7 +200,7 @@ print('=====================================================\n')
 print('Performing time integration with Nt=%d total steps...' % Nt)
 for i in range(1,Nt+1):
 
-    #set timestep based on target CFL
+    #set compute timestep or CFL
     ws_max = np.max(euler_1d_wavespeed(q))
     if(fixedCFL):
         dt = CFL*dx/ws_max
@@ -253,7 +255,7 @@ for i in range(1,Nt+1):
             p_ex = (gam-1.0)*(e_ex-0.5*rho_ex*u_ex**2)
             M_ex = np.sqrt(rho_ex*u_ex**2/(gam*p_ex))
             line1.set_ydata(rho_ex)
-            line2.set_ydata(q[3:N-3,0])
+            line2.set_ydata(q[3:-3,0])
             plt.title("Sod's Shock Tube Problem ($P_{41}$=%d, t=%2.3fms)" % (P_41,1e3*t_vec[i]),fontsize=15)
         if (saveFrames): plt.savefig('frames/frame%08d.png' % int(i/plot_freq))
         plt.pause(eps)
