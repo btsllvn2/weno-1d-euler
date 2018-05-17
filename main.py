@@ -50,7 +50,7 @@ import sys,os
 #============================================================
 Adv_Options = ['WENO','LINEAR-FD']
 Advection   = Adv_Options[0]
-runQuasi1D  = True
+runQuasi1D  = False
 saveBCData  = False
 saveFrames  = False
 fixedCFL    = True
@@ -89,7 +89,7 @@ Nx = 150
 
 # Specifiy target CFL and total number of steps
 CFL = 0.5
-Nt = 1200
+Nt = 500
 
 # Assign fixed, user-specified dt if not in CFL mode
 if(not fixedCFL):
@@ -216,17 +216,17 @@ for i in range(1,Nt+1):
     # Third-order TVD RK Scheme (Shu '97)
     #======================================
     q = update_ghost_pts(q,left_bc,right_bc)
-    L0 = spatial_rhs(char_numerical_flux(q,Advection),q,dx,left_bc,right_bc) + \
+    L0 = spatial_rhs(q,dx,Advection,left_bc,right_bc) + \
          q1d_rhs(F_vec,q[3:-3,:],left_bc,right_bc)
     q1[3:-3,:] = q[3:-3,:] + L0*dt
     
     q1 = update_ghost_pts(q1,left_bc,right_bc)
-    L1 = spatial_rhs(char_numerical_flux(q1,Advection),q1,dx,left_bc,right_bc) + \
+    L1 = spatial_rhs(q1,dx,Advection,left_bc,right_bc) + \
          q1d_rhs(F_vec,q1[3:-3,:],left_bc,right_bc)
     q2[3:-3,:] = (3/4)*q[3:-3,:] + (1/4)*q1[3:-3,:] + (1/4)*L1*dt
     
     q2 = update_ghost_pts(q2,left_bc,right_bc)
-    L2 = spatial_rhs(char_numerical_flux(q2,Advection),q2,dx,left_bc,right_bc) + \
+    L2 = spatial_rhs(q2,dx,Advection,left_bc,right_bc) + \
          q1d_rhs(F_vec,q2[3:-3,:],left_bc,right_bc)
     q[3:-3,:] = (1/3)*q[3:-3,:] + (2/3)*q2[3:-3,:]  + (2/3)*L2*dt    
     #======================================

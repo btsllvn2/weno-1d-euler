@@ -284,7 +284,7 @@ def proj_to_char(q,f,q_st):
 
     return q_char,f_char
 
-def spatial_rhs(f_char,q_cons,dx,left_bc,right_bc):
+def spatial_rhs(q_cons,dx,adv,left_bc,right_bc):
 
     '''
     f_char is a Ni x nv matrix of the characteristic flux only at interior adjacent flux interfaces
@@ -293,6 +293,9 @@ def spatial_rhs(f_char,q_cons,dx,left_bc,right_bc):
     '''
     import numpy as np
     import sys,os
+
+    #compute the flux at the x_{i+1/2} points (characteristic proj.)
+    f_char = char_numerical_flux(q_cons,adv)
     
     # Compute the state vector at the x_{1+1/2} points
     q_i_p_half = (q_cons[2:q_cons.shape[0]-3,:] + q_cons[3:q_cons.shape[0]-2,:])*0.5
