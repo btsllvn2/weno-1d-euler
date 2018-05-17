@@ -50,7 +50,7 @@ import sys,os
 #============================================================
 Adv_Options = ['WENO','LINEAR-FD']
 Advection   = Adv_Options[0]
-runQuasi1D  = False
+runQuasi1D  = True
 saveBCData  = False
 saveFrames  = False
 fixedCFL    = True
@@ -63,7 +63,7 @@ plot_freq   = 1
 #============================================================
 BC_Options = ['Non-Reflecting','Neumann','Wall','Force-Free']
 left_bc  = BC_Options[0]
-right_bc = BC_Options[0]
+right_bc = BC_Options[1]
 
 #supress the display output so code runs faster
 if (saveFrames):
@@ -74,8 +74,9 @@ import matplotlib.animation as animation
 from matplotlib import cm
 
 #create a 'frames' directory if one does not already exist
-if not os.path.exists('frames'):
+if (saveFrames and (not os.path.exists('frames'))):
     os.makedirs('frames')
+
 
 #use LaTeX formatting for titles and axes
 plt.rc('text', usetex=True)
@@ -89,7 +90,7 @@ Nx = 150
 
 # Specifiy target CFL and total number of steps
 CFL = 0.5
-Nt = 500
+Nt = 300
 
 # Assign fixed, user-specified dt if not in CFL mode
 if(not fixedCFL):
@@ -104,11 +105,11 @@ if (runQuasi1D):
     X_min,X_max = -0.40,0.60
 
     #initial location of the discontinuity [m]
-    x0 = 0.0
+    x0 = -0.0
 
     #set the initial condition
     rho4 = 1.0
-    P4 = 1e6
+    P4 = 1e8
     T4 = P4/(R*rho4)
     rho1 = 0.125
     P1 = 1e4
@@ -165,13 +166,30 @@ e_plt = q[3:-3,2]
 p_plt = (gam-1.0)*(e_plt-0.5*rho_plt*u_plt**2)
 M_plt = np.sqrt(rho_plt*u_plt**2/(gam*p_plt))
 P_41 = int(P4/P1)
+fac,exp = exp_format(P_41)
+
+#conditional formatting
+if (fac==1):
+    if (exp==1):
+        pr_str = '$P_{41}=10$'
+    else:
+        pr_str = '$P_{41}=10^%d$' % exp
+else:
+    if (exp<=2):
+        pr_str = '$P_{41}=%d$' % P_41
+    else:
+        pr_str = '$P_{41}=%d\\!\\times\\!10^%d$' % (fac,exp)
 
 #initialize frame for real-time animation  
 plt.ion()
 plt.figure()
 if(runQuasi1D):
-    print('Shock tube operating pressure ratio P_41 = %d' % P_41)
-    plt.title('Solution to GALCIT Nozzle Flow Using WENO-JS ($P_{41}$=%d, t=%2.3f[ms])' %(P_41,0.0),fontsize=15)
+    if (fac==1):
+        p_str = 'P_41 = 10^%d' % exp
+    else:
+        p_str = 'P_41 = %dx10^%d' % (fac,exp)
+    print('Shock tube operating pressure ratio %s' % p_str)
+    plt.title('Solution to GALCIT Nozzle Flow Using WENO-JS (%s, t=%2.3f[ms])' %(pr_str,0.0),fontsize=15)
     line1, = plt.plot(X[3:-3],Mach_vec,'--k',label='Isentropic Solution (Steady)',linewidth=1.0)
     line2, = plt.plot(X[3:-3],M_plt,'-b',label='WENO-JS',linewidth=3.0)
     plt.legend(loc=2,fontsize=12)
@@ -181,7 +199,7 @@ else:
     Q_exact,M_sh = Shock_Tube_Exact(X,P4,T4,P1,T1,0.0,x0,1.0)
     line1, = plt.plot(X[3:-3],Q_exact[3:-3,0],'-k',linewidth=1.0,label='Exact Solution')
     line2, = plt.plot(X[3:-3],q_init[3:-3,0],'ob',label='WENO-JS')
-    plt.title("Sod's Shock Tube Problem ($P_{41}$=%d, t=%2.3f[ms])" % (P_41,0.0),fontsize=15)
+    plt.title("Sod's Shock Tube Problem (%s, t=%2.3f[ms])" % (pr_str,0.0),fontsize=15)
     plt.ylabel('Density',fontsize=15)
     plt.legend(fontsize=12)
 plt.xlim(X_min,X_max)
@@ -197,7 +215,7 @@ print('   Selected advection scheme is: %s' % Advection)
 print('   Left-end boundary condition is: %s' % left_bc)
 print('   Right-end boundary condition is: %s' % right_bc)
 print('=====================================================\n')
-print('Performing time integration with Nt=%d total steps...' % Nt)
+print('Performing time integration with Nt = %d total steps...\n' % Nt)
 for i in range(1,Nt+1):
 
     #set compute timestep or CFL
@@ -234,18 +252,12 @@ for i in range(1,Nt+1):
     #update the stored history
     Q[:,:,i] = q[3:-3,:]
 
-    #compute and store the primitive variables
-    rho_plt = q[3:-3,0]
-    u_plt = q[3:-3,1]/rho_plt
-    e_plt = q[3:-3,2]
-    p_plt = (gam-1.0)*(e_plt-0.5*rho_plt*u_plt**2)
-    M_plt = np.sqrt(rho_plt*u_plt**2/(gam*p_plt))
-
     #real-time animation 
     if(i%plot_freq==0):
         if(runQuasi1D): 
-            plt.title('Solution to GALCIT Nozzle Flow Using WENO-JS ($P_{41}$=%d, t=%2.3fms)' % (P_41,1e3*t_vec[i]),fontsize=15)
-            line2.set_ydata(M_plt)
+            plt.title('Solution to GALCIT Nozzle Flow Using WENO-JS (%s, t=%2.3f[ms])' %(pr_str,1e3*t_vec[i]),fontsize=15)
+            q_p = q[3:-3,:]
+            line2.set_ydata((gam*(gam-1)*(q_p[:,0]*q_p[:,2]*(q_p[:,1]+eps)**(-2)-0.5))**(-0.5))
         else:
             #compute the exact solution for the 1D shock-tube problem
             Q_exact,M_sh = Shock_Tube_Exact(X,P4,T4,P1,T1,t_vec[i],x0,M_sh)
@@ -256,7 +268,7 @@ for i in range(1,Nt+1):
             M_ex = np.sqrt(rho_ex*u_ex**2/(gam*p_ex))
             line1.set_ydata(rho_ex)
             line2.set_ydata(q[3:-3,0])
-            plt.title("Sod's Shock Tube Problem ($P_{41}$=%d, t=%2.3fms)" % (P_41,1e3*t_vec[i]),fontsize=15)
+            plt.title("Sod's Shock Tube Problem (%s, t=%2.3fms)" % (pr_str,1e3*t_vec[i]),fontsize=15)
         if (saveFrames): plt.savefig('frames/frame%08d.png' % int(i/plot_freq))
         plt.pause(eps)
 
@@ -284,9 +296,9 @@ def make_XT_plot(var,v_label):
 
     #conditional formatting
     if (runQuasi1D):
-        title_str = r'GALCIT Ludwieg Tube ($P_{41}$=%d)' % P_41
+        title_str = 'GALCIT Ludwieg Tube (%s)' % pr_str
     else:
-        title_str = r"Sod's Shock Tube Problem Tube ($P_{41}$=%d)" % P_41
+        title_str = "Sod's Shock Tube Problem Tube (%s)" % pr_str
 
     plt.figure(f_num)
     plt.contourf(X,T,var,300,cmap='jet')

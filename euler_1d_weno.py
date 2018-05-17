@@ -44,6 +44,20 @@ def init_cond(X_min,X_max,N,P4,T4,P1,T1,x0=0.0):
     
     return q_init, X, dx
 
+
+#function which returns factor and exponent of a number n
+def exp_format(n,demo=False):
+
+    import numpy as np
+    
+    exp = int(np.floor(np.log10(n)))
+    fac = n/10**exp
+
+    if(demo): print('Number %5.5f is %1.3f times 10^%d' % (n,fac,exp)) 
+
+    return fac,exp
+
+
 def phys_flux(q):
 #q is an Nxnv matrix with N grid points and nv variables   
 
@@ -697,10 +711,24 @@ def Shock_Tube_Exact(X,P4,T4,P1,T1,time,x0=0.0,M_sh=1.0,mode='data'):
 
     #solve the shock-tube equation using Newton-Raphson + Complex-Step Derivative
     P_41 = q_L[2]/q_R[2]
+    fac,exp = exp_format(P_41)
+
+    #conditional formatting
+    if (fac==1):
+        if (exp==1):
+            pr_str = 'P_41=10'
+        else:
+            pr_str = 'P_41=10^%d' % exp
+    else:
+        if (exp<=2):
+            pr_str = 'P_41=%d' % P_41
+        else:
+            pr_str = 'P_41=%dx10^%d' % (fac,exp)
+
     if ((t_vec.shape[0]>1)or(np.isscalar(time) and abs(time)<eps)):
         err = 1.0; cntr = 0; h=1e-30; M_sh = 1.5
         Res = lambda M_sh: -P_41*(1-(gam-1)/(gam+1)*(c_R/c_L)*(M_sh**2-1)/M_sh)**(2*gam/(gam-1))+2*gam/(gam+1)*(M_sh**2-1)+1
-        print('Solving the shock tube equation for P_41=%3.1f:' % P_41)
+        print('Solving the shock tube equation for %s:' % pr_str)
         while (err>eps): 
             cntr += 1; Msh_p = M_sh
             M_sh -= h*Res(M_sh)/np.imag(Res(complex(M_sh,h)))
