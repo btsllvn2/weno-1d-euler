@@ -86,7 +86,7 @@ os.system('clear')
 eps = np.finfo('float').eps
 
 # Specify the number of points in the domain (includes ghost points)
-Nx = 150
+Nx = 100
 
 # Specifiy target CFL and total number of steps
 CFL = 0.5
@@ -273,6 +273,18 @@ for i in range(1,Nt+1):
         plt.pause(eps)
 
 print('\nSolution computed. Building xt-plots...')
+
+
+#save the boundary condition data for 2D/3D simulations 
+if(saveBCData):
+
+    #constants
+    sizeof_int = 4;
+    sizeof_dbl = 8;
+
+    f_name = 'GALCIT_100.dat'
+    #fid = 
+    #a = np.fromfile(f_name,dtype=np.float32)
 
 #compute XT-flow variables for plotting
 plt.ioff()

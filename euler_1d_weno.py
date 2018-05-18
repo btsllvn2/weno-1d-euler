@@ -290,11 +290,8 @@ def proj_to_char(q,f,q_st):
     L[1,2] = -(gam-1.0)/c**2
     
     #project solution/flux into characteristic space for each point in stencil
-    q_char = np.zeros(q.shape)
-    f_char = np.zeros(f.shape)
-    for i in range(q.shape[0]):
-        q_char[i,:] = (L.dot(q[i,:].T)).T
-        f_char[i,:] = (L.dot(f[i,:].T)).T
+    q_char = L.dot(q.T).T
+    f_char = L.dot(f.T).T
 
     return q_char,f_char
 
@@ -495,9 +492,8 @@ def q1d_rhs(f_vec,q,left_bc,right_bc):
     flux[:,2] = u*(p+e)
 
     #compute the rhs matrix
-    rhs = np.zeros(flux.shape)
-    for i in range(q.shape[0]):
-        rhs[i,:] = -f_vec[i]*flux[i,:]
+    F = np.diag(f_vec)
+    rhs = -F.dot(flux)
 
     return rhs
     
@@ -739,6 +735,10 @@ def Shock_Tube_Exact(X,P4,T4,P1,T1,time,x0=0.0,M_sh=1.0,mode='data'):
             if (cntr==15):
                 print('\n  **Iteration limit exceeded (e = %1.6e)\n' % err)
                 break
+
+        #compute the (lab-frame) post shock Mach number
+        M2 = 2*(M_sh**2-1)/np.sqrt((2*gam*M_sh**2-(gam-1))*(2+(gam-1)*M_sh**2))
+        print('Post-shock Mach number (lab-frame) is M2 = %2.6f' % M2)
 
     #compute the exact solution for each time in t_vec
     Nt = t_vec.shape[0]
