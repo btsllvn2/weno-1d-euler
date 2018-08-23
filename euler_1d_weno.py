@@ -566,7 +566,8 @@ def areaFunc(x,r,X_vec,makePlot=False,demo=False):
     F_vec = l_func.__call__(X_vec,1)
 
     #compute the exact x-location of the throat
-    def Res(x): return l_func.__call__(x,1)
+    #def Res(x): return l_func.__call__(x,1)
+    Res = lambda x: l_func.__call__(x,1)
     print('Computing exact location of the throat...')
     x_th = 0.05; cntr=0; err=1.0;
     x_l = 0.05; x_r = 0.20
@@ -594,7 +595,8 @@ def areaFunc(x,r,X_vec,makePlot=False,demo=False):
     #Compute the isentropic solution for the nozzle flow
     print('Computing the isentropic nozzle solution...')
     Mach_vec = np.zeros(F_vec.shape)
-    def Res(M,AR): return (2/(gam+1)*(1+0.5*(gam-1)*M**2))**((gam+1)/(2*(gam-1)))-M*AR
+    #def Res(M,AR): return (2/(gam+1)*(1+0.5*(gam-1)*M**2))**((gam+1)/(2*(gam-1)))-M*AR
+    Res = lambda M,AR: (2/(gam+1)*(1+0.5*(gam-1)*M**2))**((gam+1)/(2*(gam-1)))-M*AR
     for i in range(X_vec.shape[0]):
 
         #area ratio for current location

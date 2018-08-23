@@ -5,9 +5,12 @@
 #   Euler equations using a finite-difference formulation of the 5th-
 #   order WENO scheme by Jiang and Shu[1]. Boundary conditions are 
 #   of the characteristic type by Thompson[2]. Time-stepping is via
-#   the third-order TVD Runge-Kutta scheme suggested by Shu[3].
+#   the third-order TVD Runge-Kutta scheme suggested by Shu[3]. 
+#   Tested only in Python3.
 #
-#   B. Sullivan and S. R. Murthy, 2018
+#   B. Sullivan and S. R. Murthy
+#   University of Illinois at Urbana-Champaign
+#   May 2018
 #
 #   [1] "Efficient Implementation of Weighted ENO Schemes"
 #   Guang-Shan Jiang and Chi-Wang Shu
@@ -31,6 +34,7 @@
 #======================================================================
 
 #Import essential library functions
+from scipy.io import FortranFile
 from euler_1d_weno import *
 import scipy.linalg as la 
 import numpy as np
@@ -50,11 +54,18 @@ import sys,os
 #============================================================
 Adv_Options = ['WENO','LINEAR-FD']
 Advection   = Adv_Options[0]
-runQuasi1D  = True
+runQuasi1D  = False
 saveBCData  = False
 saveFrames  = False
 fixedCFL    = True
+useLaTeX    = True
 plot_freq   = 1
+
+# Specify the number of points in the domain (includes ghost points)
+Nx = 150
+
+# Specifiy target CFL and total number of steps
+CFL = 0.5; Nt = 150
 
 #============================================================
 #
@@ -63,7 +74,7 @@ plot_freq   = 1
 #============================================================
 BC_Options = ['Non-Reflecting','Neumann','Wall','Force-Free']
 left_bc  = BC_Options[0]
-right_bc = BC_Options[1]
+right_bc = BC_Options[0]
 
 #supress the display output so code runs faster
 if (saveFrames):
@@ -74,23 +85,16 @@ import matplotlib.animation as animation
 from matplotlib import cm
 
 #create a 'frames' directory if one does not already exist
-if (saveFrames and (not os.path.exists('frames'))):
+if not os.path.exists('frames'):
     os.makedirs('frames')
 
-
 #use LaTeX formatting for titles and axes
-plt.rc('text', usetex=True)
-plt.rc('font', family='serif')
+if (useLaTeX):
+    plt.rc('text', usetex=True)
+    plt.rc('font', family='serif')
 plt.rcParams['figure.figsize'] = (10.0,5.625)
 os.system('clear')
 eps = np.finfo('float').eps
-
-# Specify the number of points in the domain (includes ghost points)
-Nx = 100
-
-# Specifiy target CFL and total number of steps
-CFL = 0.5
-Nt = 300
 
 # Assign fixed, user-specified dt if not in CFL mode
 if(not fixedCFL):
@@ -102,7 +106,7 @@ gam = 1.4; R = 286.9
 if (runQuasi1D):
 
     # Specify the overall domain size
-    X_min,X_max = -0.40,0.60
+    X_min,X_max = -0.50,1.50
 
     #initial location of the discontinuity [m]
     x0 = -0.0
@@ -132,13 +136,23 @@ if (runQuasi1D):
                          [0.700000,   0.0579985],
                          [2.000000,   0.0579985]])
 
+    #save the grid indices which bound the test-section location
+    x_ts = 0.98*1.435
+    if((X.max()-x_ts)*(X.min()-x_ts)>0):
+        print('Warning: Test section is not within computational domain.')
+    else:
+        for i in range(X.shape[0]-1):
+            if ((X[i]-x_ts)*(X[i+1]-x_ts)<0):
+                I1,I2 = i-3,i-2
+                break
+
     #compute scaling factor (vector) for Quasi-1D source term on the grid "X"
     F_vec,x_throat,Mach_vec = areaFunc(Geom_Dat[:,0],Geom_Dat[:,1],X[3:-3],True)
-    
+
 else:
 
     # Specify the overall domain size
-    X_min,X_max = -0.60,0.60
+    X_min,X_max = -0.10,0.10
     x0 = 0.0
 
     #set the initial condition
@@ -153,7 +167,7 @@ else:
     #force Q1D source term to be identically zero
     F_vec = np.zeros(X[3:-3].shape)
 
-
+    
 #allocate arrays for computing and storing the solution
 q = np.copy(q_init)
 Q = np.zeros((q.shape[0]-6,q.shape[1],Nt+1))
@@ -261,12 +275,12 @@ for i in range(1,Nt+1):
         else:
             #compute the exact solution for the 1D shock-tube problem
             Q_exact,M_sh = Shock_Tube_Exact(X,P4,T4,P1,T1,t_vec[i],x0,M_sh)
-            rho_ex = Q_exact[3:-3,0]
-            u_ex = Q_exact[3:-3,1]/rho_ex
-            e_ex = Q_exact[3:-3,2]
-            p_ex = (gam-1.0)*(e_ex-0.5*rho_ex*u_ex**2)
-            M_ex = np.sqrt(rho_ex*u_ex**2/(gam*p_ex))
-            line1.set_ydata(rho_ex)
+            #rho_ex = Q_exact[3:-3,0]
+            #u_ex = Q_exact[3:-3,1]/rho_ex
+            #e_ex = Q_exact[3:-3,2]
+            #p_ex = (gam-1.0)*(e_ex-0.5*rho_ex*u_ex**2)
+            #M_ex = np.sqrt(rho_ex*u_ex**2/(gam*p_ex))
+            line1.set_ydata(Q_exact[3:-3,0])
             line2.set_ydata(q[3:-3,0])
             plt.title("Sod's Shock Tube Problem (%s, t=%2.3fms)" % (pr_str,1e3*t_vec[i]),fontsize=15)
         if (saveFrames): plt.savefig('frames/frame%08d.png' % int(i/plot_freq))
@@ -278,15 +292,20 @@ print('\nSolution computed. Building xt-plots...')
 #save the boundary condition data for 2D/3D simulations 
 if(saveBCData):
 
+    #decide thich values to extract
+    index = np.arange(-6,-2)
+
     #constants
     sizeof_int = 4;
     sizeof_dbl = 8;
 
-    f_name = 'GALCIT_100.dat'
+    #define the (4) points to extract data from
+
+    f_name = 'GALCIT_1E6.txt'
     #fid = 
     #a = np.fromfile(f_name,dtype=np.float32)
 
-#compute XT-flow variables for plotting
+#compute variables for XT-plots
 plt.ioff()
 R = 286.9
 RHO = Q[:,0,:].T
@@ -299,8 +318,7 @@ TEMP = P/(R*RHO)
 f_num = 3
 
 #generate XT-plots
-x_vec = X[3:-3]
-X,T = np.meshgrid(x_vec,1e3*t_vec)
+X,T = np.meshgrid(X[3:-3],1e3*t_vec)
 def make_XT_plot(var,v_label):
 
     #used outside the function
