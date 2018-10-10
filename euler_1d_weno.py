@@ -57,7 +57,6 @@ def exp_format(n,demo=False):
 
     return fac,exp
 
-
 def phys_flux(q):
 #q is an Nxnv matrix with N grid points and nv variables   
 
@@ -93,7 +92,7 @@ def euler_1d_wavespeed(q):
     e = q[:,2]
     p = (gam-1.0)*(e-0.5*rho*u**2)
     t = p/(R*rho)
-    if (t.min()<0.0):
+    if (t.min()<0):
         print('\n============================================================')
         print('     Warning: Negative temperature detected!!!')
         print('     Solution is numerically unstable. Now exiting....' % t.min())
@@ -351,7 +350,7 @@ def spatial_rhs(q_cons,dx,adv,left_bc,right_bc):
     if (right_bc == 'Neumann'): i_end += 1
     for i in range(i_start,i_end):   
         
-        # Local Right Eigen Matrices
+        # Local Right Eigenmatrices
         R_p_half = R[i+1,:,:]
         R_m_half = R[i,:,:]
  
@@ -499,7 +498,7 @@ def q1d_rhs(f_vec,q,left_bc,right_bc):
     
 f_num = 1
 def areaFunc(x,r,X_vec,makePlot=False,demo=False):
-#computes 1/A*dA/dx based on a provided geometry R(x)
+#computes 1/A*(dA/dx) based on the provided geometry R(x)
 
     from scipy.interpolate import splrep, splev
     import scipy.interpolate as interp
@@ -516,10 +515,9 @@ def areaFunc(x,r,X_vec,makePlot=False,demo=False):
     h = 1e-30
 
     #defensive programming
-    for vec in (x,r):
-        vec = np.array(vec)
+    for vec in (x,r): vec = np.array(vec)
 
-    # GALGIT Ludwieg tube geometry + Mach 5 nozzle
+    # GALGIT Ludwieg tube geometry + Mach 4 nozzle
     if (demo): 
         X = np.array([[-17.00000,  0.0568613],
                       [-0.445792,  0.0568613],
