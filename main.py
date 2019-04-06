@@ -64,10 +64,10 @@ useLaTeX    = True
 plot_freq   = 1
 
 # Specify the number of points in the domain (includes ghost points)
-Nx = 150
+Nx = 300
 
 # Specifiy target CFL and total number of steps
-CFL = 0.5; Nt = 500
+CFL = 0.5; Nt = 200+2
 
 #============================================================
 #
@@ -93,7 +93,8 @@ if not os.path.exists('frames'):
 if (useLaTeX):
     plt.rc('text', usetex=True)
     plt.rc('font', family='serif')
-plt.rcParams['figure.figsize'] = (10.0,5.625)
+plt.rcParams['figure.figsize'] = (9.5,5.625)
+plt.rcParams.update({'font.size': 23})
 os.system('clear')
 eps = np.finfo('float').eps
 
@@ -231,31 +232,31 @@ if (runMode == 'Quasi-1D'):
     else:
         p_str = 'P_41 = %dx10^%d' % (fac,exp)
     print('Shock tube operating pressure ratio %s' % p_str)
-    plt.title('Solution to GALCIT Nozzle Flow Using WENO-JS (%s, t=%2.3f[ms])' %(pr_str,0.0),fontsize=15)
+    plt.title('Solution to GALCIT Nozzle Flow Using WENO-JS (%s, t=%2.3f[ms])' %(pr_str,0.0))
     line1, = plt.plot(X[3:-3],Mach_vec,'--k',label='Isentropic Solution (Steady)',linewidth=1.0)
     line2, = plt.plot(X[3:-3],M_plt,'-b',label='WENO-JS',linewidth=3.0)
-    plt.legend(loc=2,fontsize=12)
-    plt.ylabel('Mach',fontsize=15)
+    plt.legend(loc=2)
+    plt.ylabel('Mach')
     plt.ylim(0,5.0)
 elif (runMode == '1D'):
     Q_exact,M_sh = Shock_Tube_Exact(X,P4,T4,P1,T1,0.0,x0,1.0)
     line1, = plt.plot(X[3:-3],Q_exact[3:-3,0],'-k',linewidth=1.0,label='Exact Solution')
     line2, = plt.plot(X[3:-3],q_init[3:-3,0],'ob',label='WENO-JS')
-    plt.title("Sod's Shock Tube Problem (%s, t=%2.3f[ms])" % (pr_str,0.0),fontsize=15)
-    plt.ylabel('Density',fontsize=15)
-    plt.legend(fontsize=12)
+    plt.title("Sod's Shock Tube Problem (%s, t=%2.3f[ms])" % (pr_str,0.0))
+    plt.ylabel('Density')
+    plt.legend()
 elif (runMode == 'Axisymmetric'):
     if (fac==1):
         p_str = 'P_41 = 10^%d' % exp
     else:
         p_str = 'P_41 = %dx10^%d' % (fac,exp)
     print('Shock tube operating pressure ratio %s' % p_str)
-    plt.title('Axisymmetric Shock Tube Problem (%s, t=%2.3f[ms])' %(pr_str,0.0),fontsize=15)
+    plt.title('Axisymmetric Shock Tube Problem (%s, t=%2.3f[ms])' %(pr_str,0.0))
     line2, = plt.plot(X[3:-3],q_init[3:-3,0],'-b',label='WENO-JS',linewidth=3.0)
-    plt.legend(loc=2,fontsize=12)
-    plt.ylabel('Density',fontsize=15)
+    plt.legend(loc=2)
+    plt.ylabel('Density')
 plt.xlim(X_min,X_max)
-plt.xlabel(r'$x$[m]',fontsize=15)
+plt.xlabel(r'$x$[m]')
 plt.draw()
 plt.savefig('frames/frame%08d.png' % 0)
 plt.pause(eps)
@@ -308,7 +309,7 @@ for i in range(1,Nt+1):
     #real-time animation 
     if(i%plot_freq==0):
         if (runMode == 'Quasi-1D'):
-            plt.title('Solution to GALCIT Nozzle Flow Using WENO-JS (%s, t=%2.3f[ms])' %(pr_str,1e3*t_vec[i]),fontsize=15)
+            plt.title('Solution to GALCIT Nozzle Flow Using WENO-JS (%s, t=%2.3f[ms])' %(pr_str,1e3*t_vec[i]))
             q_p = q[3:-3,:]
             line2.set_ydata((gam*(gam-1)*(q_p[:,0]*q_p[:,2]*(q_p[:,1]+eps)**(-2)-0.5))**(-0.5))
         elif (runMode == '1D'):
@@ -321,10 +322,10 @@ for i in range(1,Nt+1):
             #M_ex = np.sqrt(rho_ex*u_ex**2/(gam*p_ex))
             line1.set_ydata(Q_exact[3:-3,0])
             line2.set_ydata(q[3:-3,0])
-            plt.title("Sod's Shock Tube Problem (%s, t=%2.3fms)" % (pr_str,1e3*t_vec[i]),fontsize=15)
+            plt.title("Sod's Shock Tube Problem (%s, t=%2.3fms)" % (pr_str,1e3*t_vec[i]))
         elif (runMode == 'Axisymmetric'):
             line2.set_ydata(q[3:-3,0])
-            plt.title("Axisymmetric Shock Tube Problem (%s, t=%2.3fms)" % (pr_str,1e3*t_vec[i]),fontsize=15)
+            plt.title("Axisymmetric Shock Tube Problem (%s, t=%2.3fms)" % (pr_str,1e3*t_vec[i]))
         if (saveFrames): plt.savefig('frames/frame%08d.png' % int(i/plot_freq))
         plt.pause(eps)
 
@@ -359,8 +360,46 @@ ENTROPY = (P/P4)/(RHO/rho4)**gam
 TEMP = P/(R*RHO)
 f_num = 3
 
+#make plot showing final state(s)
+Q_exact,M_sh = Shock_Tube_Exact(X,P4,T4,P1,T1,t_vec[-1],x0,M_sh)
+RHO_exact = Q_exact[3:-3,0]
+U_exact = Q_exact[3:-3,1]/RHO_exact
+E_exact = Q_exact[3:-3,2]
+P_exact = (gam-1)*(E_exact-0.5*RHO_exact*U_exact**2)
+M_exact = np.sqrt(RHO_exact*U_exact**2/(gam*P_exact))
+ENTR_exact = (P_exact/P4)/(RHO_exact/rho4)**gam
+T_exact = P_exact/(R*RHO_exact)
+
+#generate snapshots
+def make_var_plot(var,var_exact,v_label):
+
+    #used outside the function
+    global f_num
+
+    #conditional formatting
+    if (runMode == 'Quasi-1D'):
+        title_str = 'GALCIT Ludwieg Tube (%s)' % pr_str
+    elif (runMode == '1D'):
+        title_str = "Sod's Shock Tube Problem Tube (%s)" % pr_str
+    elif (runMode == 'Axisymmetric'):
+        title_str = 'Axisymmetric Shock Tube Problem (%s)' % pr_str
+
+    #make the plot
+    plt.figure(f_num)
+    plt.scatter(X[3:-3],var[-1,:],s=80,facecolors='none',edgecolors='b',label='WENO-JS',zorder=2)
+    plt.plot(X[3:-3],var_exact,'-r',linewidth=1.0,label='Exact Solution',zorder=1)
+    plt.title("Sod's Shock Tube Problem (%s, t=%2.3fms)" % (pr_str,1e3*t_vec[-1]))
+    plt.xlabel(r'$x$ [m]')
+    plt.ylabel(v_label,labelpad=5)
+    plt.xlim(X_min,X_max)
+    plt.tight_layout()
+    plt.grid()
+    plt.savefig('fig_%d.png' % f_num)
+    f_num += 1
+
+    return
+
 #generate XT-plots
-X,T = np.meshgrid(X[3:-3],1e3*t_vec)
 def make_XT_plot(var,v_label):
 
     #used outside the function
@@ -373,11 +412,15 @@ def make_XT_plot(var,v_label):
         title_str = "Sod's Shock Tube Problem Tube (%s)" % pr_str
     elif (runMode == 'Axisymmetric'):
         title_str = 'Axisymmetric Shock Tube Problem (%s)' % pr_str
+
+    #make the plot
+    X_msh,T_msh = np.meshgrid(X[3:-3],1e3*t_vec)
     plt.figure(f_num)
-    plt.contourf(X,T,var,300,cmap='jet')
-    plt.title(title_str,fontsize=12)
-    plt.xlabel(r'$x$ [m]',fontsize=12)
-    plt.ylabel(r'Time [ms]',fontsize=12)
+    plt.contourf(X_msh,T_msh,var,300,cmap='jet')
+    plt.title(title_str)
+    plt.xlabel(r'$x$ [m]')
+    plt.ylabel(r'Time [ms]')
+    plt.tight_layout()
     cb = plt.colorbar()
     cb.set_label(v_label, labelpad=20, rotation=-90)
     plt.savefig('fig_%d.png' % f_num)
@@ -386,9 +429,12 @@ def make_XT_plot(var,v_label):
     return
 
 #make an xt-plot for each variable
-var_lst = [RHO,P,TEMP,M,U,1e-6*E,ENTROPY]
-label_lst = [r'Density [kg/$m^3$]',r'Pressure [Pa]',r'Temperature [K]',r'Mach [-]',r'Velocity [m/s]',r'Specific Energy [MJ/kg]',r'Measure of Entropy']
-for i in range(len(var_lst)): make_XT_plot(var_lst[i],label_lst[i])
+var_lst = [RHO,1e-3*P,TEMP,M,U,1e-6*E,ENTROPY]
+varex_lst = [RHO_exact,1e-3*P_exact,T_exact,M_exact,U_exact,1e-6*E_exact,ENTR_exact]
+label_lst = [r'Density [kg/$m^3$]',r'Pressure [kPa]',r'Temperature [K]',r'Mach [-]',r'Velocity [m/s]',r'Specific Energy [MJ/kg]',r'Measure of Entropy']
+for i in range(len(var_lst)): 
+    make_var_plot(var_lst[i],varex_lst[i],label_lst[i])
+    make_XT_plot(var_lst[i],label_lst[i])
 
 plt.show()  
 print('Program complete.\n')
