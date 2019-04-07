@@ -497,7 +497,7 @@ def q1d_rhs(f_vec,q,left_bc,right_bc):
     return rhs
     
 f_num = 1
-def areaFunc(x,r,X_vec,makePlot=False,demo=False):
+def areaFunc(input_data,X_vec,makePlot=False,demo=False):
 #computes 1/A*(dA/dx) based on the provided geometry R(x)
 
     from scipy.interpolate import splrep, splev
@@ -514,8 +514,20 @@ def areaFunc(x,r,X_vec,makePlot=False,demo=False):
     R = 286.9
     h = 1e-30
 
+    #define the location and radii
+    x,r = input_data[:,0],input_data[:,1] 
+
     #defensive programming
     for vec in (x,r): vec = np.array(vec)
+
+    #output geometric data to the terminal
+    print('\n    Provided Geometric Definition:\n')
+    print('    x[m]\tr[m]\t\tA[m^2]\t\tAt/A[-]')
+    print('==============================================================')
+    for i in range(x.size):
+        print('    %2.6f\t%1.6f\t%f\t%2.6f' % (x[i],r[i],np.pi*r[i]**2,(r.min()/r[i])**2))
+
+    sys.exit()
 
     # GALGIT Ludwieg tube geometry + Mach 4 nozzle
     if (demo): 
@@ -551,10 +563,10 @@ def areaFunc(x,r,X_vec,makePlot=False,demo=False):
         plt.plot([-1,3],[0,0],'-.k',linewidth=2,zorder=3)
         plt.xlim(-0.1,0.7)
         plt.ylim(-0.1,0.1)
-        plt.xlabel(r'$x\;[m]$',fontsize=15)
-        plt.ylabel(r'$r\;[m]$',fontsize=15)
-        plt.title(r'GALCIT Ludwieg Tube Mach 4 Nozzle',fontsize=17)
-        plt.legend(fontsize=12)
+        plt.xlabel(r'$x\;[m]$')
+        plt.ylabel(r'$r\;[m]$')
+        plt.title(r'GALCIT Ludwieg Tube Mach 4 Nozzle')
+        plt.legend()
         plt.savefig('nozzle.pdf')
         plt.savefig('nozzle.png')
         f_num += 1
@@ -712,14 +724,14 @@ def Shock_Tube_Exact(X,P4,T4,P1,T1,time,x0=0.0,M_sh=1.0,mode='data'):
     #conditional formatting
     if (fac==1):
         if (exp==1):
-            pr_str = 'P_41=10'
+            pr_str = 'P_51=10'
         else:
-            pr_str = 'P_41=10^%d' % exp
+            pr_str = 'P_51=10^%d' % exp
     else:
         if (exp<=2):
-            pr_str = 'P_41=%d' % P_41
+            pr_str = 'P_51=%d' % P_41
         else:
-            pr_str = 'P_41=%dx10^%d' % (fac,exp)
+            pr_str = 'P_51=%dx10^%d' % (fac,exp)
 
     if ((t_vec.shape[0]>1)or(np.isscalar(time) and abs(time)<eps)):
         err = 1.0; cntr = 0; h=1e-30; M_sh = 1.5

@@ -54,11 +54,11 @@ import sys,os
 #============================================================
 Run_Mode_Options = ['1D','Quasi-1D','Axisymmetric']
 Adv_Options = ['WENO','LINEAR-FD']
-runMode     = Run_Mode_Options[0]
+runMode     = Run_Mode_Options[1]
 Advection   = Adv_Options[0]
 runQuasi1D  = True
 saveBCData  = False
-saveFrames  = False
+saveFrames  = True
 fixedCFL    = True
 useLaTeX    = True
 plot_freq   = 1
@@ -67,7 +67,7 @@ plot_freq   = 1
 Nx = 300
 
 # Specifiy target CFL and total number of steps
-CFL = 0.5; Nt = 200+2
+CFL = 0.5; Nt = 1000+2
 
 #============================================================
 #
@@ -93,7 +93,7 @@ if not os.path.exists('frames'):
 if (useLaTeX):
     plt.rc('text', usetex=True)
     plt.rc('font', family='serif')
-plt.rcParams['figure.figsize'] = (9.5,5.625)
+plt.rcParams['figure.figsize'] = (10,6)
 plt.rcParams.update({'font.size': 23})
 os.system('clear')
 eps = np.finfo('float').eps
@@ -108,17 +108,17 @@ gam = 1.4; R = 286.9
 if (runMode == 'Quasi-1D'):
 
     # Specify the overall domain size
-    X_min,X_max = -0.50,1.50
+    X_min,X_max = -0.50,0.5
 
     #initial location of the discontinuity [m]
     x0 = 0.0
 
     #set the initial condition
     rho4 = 1.0
-    P4 = 1e8
+    P4 = 1e6
     T4 = P4/(R*rho4)
     rho1 = 0.125
-    P1 = 1e4
+    P1 = 1e3
     T1 = P1/(R*rho1)
     q_init,X,dx = init_cond(X_min,X_max,Nx,P4,T4,P1,T1,x0)
 
@@ -149,7 +149,7 @@ if (runMode == 'Quasi-1D'):
                 break
 
     #compute scaling factor (vector) for Quasi-1D source term on the grid "X"
-    F_vec,x_throat,Mach_vec = areaFunc(Geom_Dat[:,0],Geom_Dat[:,1],X[3:-3],True)
+    F_vec,x_throat,Mach_vec = areaFunc(Geom_Dat,X[3:-3],True)
 
 elif (runMode == 'Axisymmetric'):
 
@@ -208,31 +208,31 @@ u_plt = q[3:-3,1]/rho_plt
 e_plt = q[3:-3,2]
 p_plt = (gam-1.0)*(e_plt-0.5*rho_plt*u_plt**2)
 M_plt = np.sqrt(rho_plt*u_plt**2/(gam*p_plt))
-P_41 = int(P4/P1)
-fac,exp = exp_format(P_41)
+P_51 = int(P4/P1)
+fac,exp = exp_format(P_51)
 
 #conditional formatting
 if (fac==1):
     if (exp==1):
-        pr_str = '$P_{41}=10$'
+        pr_str = '$P_{51}=10$'
     else:
-        pr_str = '$P_{41}=10^%d$' % exp
+        pr_str = '$P_{51}=10^%d$' % exp
 else:
     if (exp<=2):
-        pr_str = '$P_{41}=%d$' % P_41
+        pr_str = '$P_{51}=%d$' % P_51
     else:
-        pr_str = '$P_{41}=%d\\!\\times\\!10^%d$' % (fac,exp)
+        pr_str = '$P_{51}=%d\\!\\times\\!10^%d$' % (fac,exp)
 
 #initialize frame for real-time animation  
 plt.ion()
 plt.figure()
 if (runMode == 'Quasi-1D'):
     if (fac==1):
-        p_str = 'P_41 = 10^%d' % exp
+        p_str = 'P_51 = 10^%d' % exp
     else:
-        p_str = 'P_41 = %dx10^%d' % (fac,exp)
+        p_str = 'P_51 = %dx10^%d' % (fac,exp)
     print('Shock tube operating pressure ratio %s' % p_str)
-    plt.title('Solution to GALCIT Nozzle Flow Using WENO-JS (%s, t=%2.3f[ms])' %(pr_str,0.0))
+    plt.title('Solution to GALCIT Nozzle Flow (%s, t=%2.3f[ms])' %(pr_str,0.0))
     line1, = plt.plot(X[3:-3],Mach_vec,'--k',label='Isentropic Solution (Steady)',linewidth=1.0)
     line2, = plt.plot(X[3:-3],M_plt,'-b',label='WENO-JS',linewidth=3.0)
     plt.legend(loc=2)
@@ -247,14 +247,15 @@ elif (runMode == '1D'):
     plt.legend()
 elif (runMode == 'Axisymmetric'):
     if (fac==1):
-        p_str = 'P_41 = 10^%d' % exp
+        p_str = 'P_51 = 10^%d' % exp
     else:
-        p_str = 'P_41 = %dx10^%d' % (fac,exp)
+        p_str = 'P_51 = %dx10^%d' % (fac,exp)
     print('Shock tube operating pressure ratio %s' % p_str)
     plt.title('Axisymmetric Shock Tube Problem (%s, t=%2.3f[ms])' %(pr_str,0.0))
     line2, = plt.plot(X[3:-3],q_init[3:-3,0],'-b',label='WENO-JS',linewidth=3.0)
     plt.legend(loc=2)
     plt.ylabel('Density')
+plt.tight_layout()
 plt.xlim(X_min,X_max)
 plt.xlabel(r'$x$[m]')
 plt.draw()
@@ -282,24 +283,23 @@ for i in range(1,Nt+1):
     #update the time history
     t_vec[i] = t_vec[i-1] + dt
 
+    #if (runMode == 'Quasi-1D') and (t_vec[i] == 1e-4):
+
     #display to terminal
     print('n = %d,  CFL = %1.2f,  dt = %1.2es,  t = %1.2es' % (i,CFL,dt,t_vec[i]))
     
     # Third-order TVD RK Scheme (Shu '97)
     #======================================
     q = update_ghost_pts(q,left_bc,right_bc)
-    L0 = spatial_rhs(q,dx,Advection,left_bc,right_bc) + \
-         q1d_rhs(F_vec,q[3:-3,:],left_bc,right_bc)
+    L0 = spatial_rhs(q,dx,Advection,left_bc,right_bc) + q1d_rhs(F_vec,q[3:-3,:],left_bc,right_bc)
     q1[3:-3,:] = q[3:-3,:] + L0*dt
     
     q1 = update_ghost_pts(q1,left_bc,right_bc)
-    L1 = spatial_rhs(q1,dx,Advection,left_bc,right_bc) + \
-         q1d_rhs(F_vec,q1[3:-3,:],left_bc,right_bc)
+    L1 = spatial_rhs(q1,dx,Advection,left_bc,right_bc) + q1d_rhs(F_vec,q1[3:-3,:],left_bc,right_bc)
     q2[3:-3,:] = (3/4)*q[3:-3,:] + (1/4)*q1[3:-3,:] + (1/4)*L1*dt
     
     q2 = update_ghost_pts(q2,left_bc,right_bc)
-    L2 = spatial_rhs(q2,dx,Advection,left_bc,right_bc) + \
-         q1d_rhs(F_vec,q2[3:-3,:],left_bc,right_bc)
+    L2 = spatial_rhs(q2,dx,Advection,left_bc,right_bc) + q1d_rhs(F_vec,q2[3:-3,:],left_bc,right_bc)
     q[3:-3,:] = (1/3)*q[3:-3,:] + (2/3)*q2[3:-3,:]  + (2/3)*L2*dt    
     #======================================
 
@@ -309,7 +309,7 @@ for i in range(1,Nt+1):
     #real-time animation 
     if(i%plot_freq==0):
         if (runMode == 'Quasi-1D'):
-            plt.title('Solution to GALCIT Nozzle Flow Using WENO-JS (%s, t=%2.3f[ms])' %(pr_str,1e3*t_vec[i]))
+            plt.title('Solution to GALCIT Nozzle Flow (%s, t=%2.3f[ms])' %(pr_str,1e3*t_vec[i]))
             q_p = q[3:-3,:]
             line2.set_ydata((gam*(gam-1)*(q_p[:,0]*q_p[:,2]*(q_p[:,1]+eps)**(-2)-0.5))**(-0.5))
         elif (runMode == '1D'):
@@ -361,14 +361,16 @@ TEMP = P/(R*RHO)
 f_num = 3
 
 #make plot showing final state(s)
-Q_exact,M_sh = Shock_Tube_Exact(X,P4,T4,P1,T1,t_vec[-1],x0,M_sh)
-RHO_exact = Q_exact[3:-3,0]
-U_exact = Q_exact[3:-3,1]/RHO_exact
-E_exact = Q_exact[3:-3,2]
-P_exact = (gam-1)*(E_exact-0.5*RHO_exact*U_exact**2)
-M_exact = np.sqrt(RHO_exact*U_exact**2/(gam*P_exact))
-ENTR_exact = (P_exact/P4)/(RHO_exact/rho4)**gam
-T_exact = P_exact/(R*RHO_exact)
+if (runMode == '1D'):
+    Q_exact,M_sh = Shock_Tube_Exact(X,P4,T4,P1,T1,t_vec[-1],x0,M_sh)
+    RHO_exact = Q_exact[3:-3,0]
+    U_exact = Q_exact[3:-3,1]/RHO_exact
+    E_exact = Q_exact[3:-3,2]
+    P_exact = (gam-1)*(E_exact-0.5*RHO_exact*U_exact**2)
+    M_exact = np.sqrt(RHO_exact*U_exact**2/(gam*P_exact))
+    ENTR_exact = (P_exact/P4)/(RHO_exact/rho4)**gam
+    T_exact = P_exact/(R*RHO_exact)
+    varex_lst = [RHO_exact,1e-3*P_exact,T_exact,M_exact,U_exact,1e-6*E_exact,ENTR_exact]
 
 #generate snapshots
 def make_var_plot(var,var_exact,v_label):
@@ -378,7 +380,7 @@ def make_var_plot(var,var_exact,v_label):
 
     #conditional formatting
     if (runMode == 'Quasi-1D'):
-        title_str = 'GALCIT Ludwieg Tube (%s)' % pr_str
+        title_str = 'GALCIT Nozzle Flow (%s)' % pr_str
     elif (runMode == '1D'):
         title_str = "Sod's Shock Tube Problem Tube (%s)" % pr_str
     elif (runMode == 'Axisymmetric'):
@@ -422,7 +424,7 @@ def make_XT_plot(var,v_label):
     plt.ylabel(r'Time [ms]')
     plt.tight_layout()
     cb = plt.colorbar()
-    cb.set_label(v_label, labelpad=20, rotation=-90)
+    cb.set_label(v_label, labelpad=35, rotation=-90)
     plt.savefig('fig_%d.png' % f_num)
     f_num += 1
 
@@ -430,10 +432,9 @@ def make_XT_plot(var,v_label):
 
 #make an xt-plot for each variable
 var_lst = [RHO,1e-3*P,TEMP,M,U,1e-6*E,ENTROPY]
-varex_lst = [RHO_exact,1e-3*P_exact,T_exact,M_exact,U_exact,1e-6*E_exact,ENTR_exact]
 label_lst = [r'Density [kg/$m^3$]',r'Pressure [kPa]',r'Temperature [K]',r'Mach [-]',r'Velocity [m/s]',r'Specific Energy [MJ/kg]',r'Measure of Entropy']
 for i in range(len(var_lst)): 
-    make_var_plot(var_lst[i],varex_lst[i],label_lst[i])
+    if (runMode == '1D'): make_var_plot(var_lst[i],varex_lst[i],label_lst[i])
     make_XT_plot(var_lst[i],label_lst[i])
 
 plt.show()  
