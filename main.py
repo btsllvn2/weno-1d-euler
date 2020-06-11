@@ -54,11 +54,11 @@ import sys,os
 #============================================================
 Run_Mode_Options = ['1D','Quasi-1D','Axisymmetric']
 Adv_Options = ['WENO','LINEAR-FD']
-runMode     = Run_Mode_Options[1]
+runMode     = Run_Mode_Options[0]
 Advection   = Adv_Options[0]
 runQuasi1D  = True
 saveBCData  = False
-saveFrames  = True
+saveFrames  = False #True
 fixedCFL    = True
 useLaTeX    = True
 plot_freq   = 1
@@ -84,6 +84,8 @@ if (saveFrames):
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from matplotlib import cm
+
+os.system('clear')
 
 #create a 'frames' directory if one does not already exist
 if not os.path.exists('frames'):
